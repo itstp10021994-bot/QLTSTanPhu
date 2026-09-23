@@ -1,12 +1,11 @@
 import streamlit as st
 
-from qlts import auth, kiemke, schema, storage
+from qlts import auth, kiemke, thietbi
 
 user = auth.require()
 st.subheader("Kiểm kê phòng tôi quản lý")
 
-phong = storage.load(schema.PHONG)
-rooms = list(phong[phong["NguoiQuanLy"].str.strip().str.lower() == user.email]["Title"])
+rooms = thietbi.rooms_managed_by(user.email)
 if not rooms:
     st.info("Bạn chưa được phân công quản lý phòng nào.")
 else:

@@ -1,54 +1,55 @@
+import pandas as pd
 import streamlit as st
 
-from qlts import auth, schema, storage, ui
+from qlts import auth, schema, storage, thietbi, ui
 
 auth.require(schema.ROLE_BGH, schema.ROLE_QLTS)
 st.subheader("Báo cáo tổng quan BGH")
 
 tb = storage.load(schema.THIET_BI)
-phong = storage.load(schema.PHONG)
 kk = storage.load(schema.KIEM_KE)
 dc = storage.load(schema.DIEU_CHUYEN)
 labels = ui.room_label_map()
+managers = thietbi.room_managers()
+rooms = thietbi.all_rooms()
 
-active = tb[tb["TinhTrang"] != "Đã thanh lý"].copy()
-active["GiaTri"] = active["SoLuong"] * active["NguyenGia"]
-bad = active[~active["TinhTrang"].isin(["Tốt", ""])]
+disposed = thietbi.is_disposed(tb)
+active = tb[~disposed]
+bad = active[thietbi.needs_attention(active)]
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Số phòng", len(phong), border=True)
-m2.metric("Tổng số lượng thiết bị", f"{int(active['SoLuong'].sum()):,}".replace(",", "."), border=True)
-m3.metric("Tổng nguyên giá", ui.money_short(active["GiaTri"].sum()), border=True,
-          help=ui.money(active["GiaTri"].sum()))
-m4.metric("Thiết bị cần sửa / thanh lý", f"{int(bad['SoLuong'].sum()):,}".replace(",", "."), border=True)
+m1.metric("Thiết bị đang sử dụng", f"{len(active):,}".replace(",", "."), border=True)
+m2.metric("Tổng giá trị", ui.money_short(active["GiaTri"].sum()), border=True, help=ui.money(active["GiaTri"].sum()))
+m3.metric("Cần kiểm tra / sửa / thanh lý", len(bad), border=True)
+m4.metric("Đã thanh lý", int(disposed.sum()), border=True)
 
 BAR = "#2a78c4"  # một màu duy nhất: mỗi biểu đồ chỉ có một chuỗi dữ liệu
 
 c1, c2 = st.columns(2)
 with c1:
-    st.markdown("##### Số lượng thiết bị theo tình trạng")
-    by_state = active.groupby("TinhTrang", as_index=False)["SoLuong"].sum()
-    by_state = by_state.rename(columns={"TinhTrang": "Tình trạng", "SoLuong": "Số lượng"})
-    st.bar_chart(by_state, x="Tình trạng", y="Số lượng", color=BAR, horizontal=True, sort="-Số lượng")
+    st.markdown("##### Số thiết bị theo tình trạng")
+    by_state = active.assign(TinhTrang=active["TinhTrang"].replace("", "(trống)")).groupby(
+        "TinhTrang", as_index=False).size().rename(columns={"TinhTrang": "Tình trạng", "size": "Số thiết bị"})
+    st.bar_chart(by_state, x="Tình trạng", y="Số thiết bị", color=BAR, horizontal=True, sort="-Số thiết bị")
 with c2:
-    st.markdown("##### Giá trị thiết bị theo loại (VNĐ)")
-    by_type = active.groupby("LoaiThietBi", as_index=False)["GiaTri"].sum()
-    by_type = by_type.rename(columns={"LoaiThietBi": "Loại", "GiaTri": "Giá trị"})
-    st.bar_chart(by_type, x="Loại", y="Giá trị", color=BAR, horizontal=True, sort="-Giá trị")
+    st.markdown("##### 10 loại thiết bị nhiều nhất")
+    by_name = active.assign(TenThietBi=active["TenThietBi"].where(active["TenThietBi"] != "", active["ChiTiet"]))
+    by_name = by_name.groupby("TenThietBi", as_index=False).size().nlargest(10, "size")
+    by_name = by_name.rename(columns={"TenThietBi": "Thiết bị", "size": "Số lượng"})
+    st.bar_chart(by_name, x="Thiết bị", y="Số lượng", color=BAR, horizontal=True, sort="-Số lượng")
 
-st.markdown("##### Tổng hợp theo phòng")
-by_room = (
-    active.groupby("MaPhong")
-    .agg(SoDauTB=("Title", "count"), SoLuong=("SoLuong", "sum"), GiaTri=("GiaTri", "sum"))
-    .reset_index()
-)
-by_room = phong[["Title", "TenPhong", "KhuVuc", "TenNguoiQuanLy"]].merge(
-    by_room, left_on="Title", right_on="MaPhong", how="left"
-).drop(columns="MaPhong").fillna({"SoDauTB": 0, "SoLuong": 0, "GiaTri": 0})
-room_view = by_room.rename(columns={
-    "Title": "Mã phòng", "TenPhong": "Tên phòng", "KhuVuc": "Khu vực", "TenNguoiQuanLy": "Người quản lý",
-    "SoDauTB": "Số đầu TB", "SoLuong": "Tổng số lượng", "GiaTri": "Giá trị (VNĐ)",
-})
+st.markdown("##### Tổng hợp theo nơi sử dụng")
+room_rows = []
+for room in rooms:
+    items = active[active["NoiSuDung"] == room]
+    room_rows.append({
+        "Nơi sử dụng": labels.get(room, room),
+        "Quản lý phòng": managers.get(room, ""),
+        "Số thiết bị": len(items),
+        "Cần xử lý": int(thietbi.needs_attention(items).sum()),
+        "Giá trị (VNĐ)": items["GiaTri"].sum(),
+    })
+room_view = pd.DataFrame(room_rows)
 st.dataframe(room_view, hide_index=True, width="stretch",
              column_config={"Giá trị (VNĐ)": st.column_config.NumberColumn(format="localized")})
 
@@ -59,28 +60,28 @@ if not dots:
     st.caption("Chưa có đợt kiểm kê nào.")
 else:
     dot = st.selectbox("Đợt kiểm kê", dots)
-    cur = kk[kk["DotKiemKe"] == dot].copy()
-    cur["ChenhLech"] = cur["SoLuongThucTe"] - cur["SoLuongSoSach"]
+    cur = kk[kk["DotKiemKe"] == dot]
     done = cur["MaPhong"].nunique()
     k1, k2, k3 = st.columns(3)
-    k1.metric("Phòng đã kiểm kê", f"{done}/{len(phong)}", border=True)
-    k2.metric("Thiết bị chênh lệch", int((cur["ChenhLech"] != 0).sum()), border=True)
-    k3.metric("Tổng chênh lệch số lượng", int(cur["ChenhLech"].sum()), border=True)
-    pending = phong[~phong["Title"].isin(cur["MaPhong"])]
-    if not pending.empty:
-        st.caption("Phòng chưa kiểm kê: " + ", ".join(labels.get(r, r) for r in pending["Title"]))
-    kk_view = cur.drop(columns="id").rename(columns={**schema.labels_of(schema.KIEM_KE), "ChenhLech": "Chênh lệch"})
+    k1.metric("Phòng đã kiểm kê", f"{done}/{len(rooms)}", border=True)
+    k2.metric("Thiết bị đã kiểm", len(cur), border=True)
+    k3.metric("Không tìm thấy", int((cur["SoLuongThucTe"] == 0).sum()), border=True)
+    pending = [r for r in rooms if r not in set(cur["MaPhong"])]
+    if pending:
+        st.caption("Chưa kiểm kê: " + ", ".join(labels.get(r, r) for r in pending))
+    kk_view = cur.drop(columns="id").rename(columns=schema.labels_of(schema.KIEM_KE))
 
-st.markdown("##### Thiết bị cần sửa chữa / thanh lý")
-ui.show_table(bad, schema.THIET_BI, ["Title", "TenThietBi", "MaPhong", "SoLuong", "DonViTinh", "TinhTrang", "GhiChu"])
+st.markdown("##### Thiết bị cần kiểm tra / sửa chữa / thanh lý")
+ui.show_table(bad, schema.THIET_BI, ["MaChiTiet", "TenThietBi", "DacDiem", "NoiSuDung", "TinhTrang", "GhiChu"])
 
 st.markdown("##### Điều chuyển gần đây")
-ui.show_table(dc.sort_values("NgayDieuChuyen", ascending=False).head(10), schema.DIEU_CHUYEN)
+ui.show_table(dc.sort_values("NgayDieuChuyen", ascending=False).head(10), schema.DIEU_CHUYEN,
+              ["Title", "TenThietBi", "TuPhong", "DenPhong", "NgayDieuChuyen", "NguoiThucHien"])
 
 sheets = {
     "TongHopPhong": room_view,
     "ThietBi": tb.drop(columns="id").rename(columns=schema.labels_of(schema.THIET_BI)),
-    "CanXuLy": bad.drop(columns=["id", "GiaTri"]).rename(columns=schema.labels_of(schema.THIET_BI)),
+    "CanXuLy": bad.drop(columns="id").rename(columns=schema.labels_of(schema.THIET_BI)),
     "DieuChuyen": dc.drop(columns="id").rename(columns=schema.labels_of(schema.DIEU_CHUYEN)),
 }
 if kk_view is not None:

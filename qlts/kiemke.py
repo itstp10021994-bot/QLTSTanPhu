@@ -7,7 +7,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from . import schema, storage, ui
+from . import schema, storage, thietbi, ui
 from .auth import CurrentUser
 
 
@@ -45,66 +45,67 @@ def render(user: CurrentUser, rooms: list[str], key: str, allow_update_status: b
     checked = [r for r in rooms if r in done_rooms]
     st.progress(len(checked) / len(rooms), text=f"Tiến độ: đã kiểm kê {len(checked)}/{len(rooms)} phòng")
 
-    tb = storage.load(schema.THIET_BI)
-    tb = tb[(tb["MaPhong"] == room) & (tb["TinhTrang"] != "Đã thanh lý")]
+    all_tb = storage.load(schema.THIET_BI)
+    tb = all_tb[(all_tb["NoiSuDung"] == room) & ~thietbi.is_disposed(all_tb)].drop_duplicates("MaChiTiet")
     if tb.empty:
         st.info("Phòng này chưa có thiết bị.")
         return
 
     existing = kk[(kk["DotKiemKe"] == dot) & (kk["MaPhong"] == room)].drop_duplicates("Title", keep="last")
     existing = existing.set_index("Title")
+    status_opts = thietbi.status_options(all_tb)
 
     rows = []
     for r in tb.itertuples():
-        old = existing.loc[r.Title] if r.Title in existing.index else None
+        old = existing.loc[r.MaChiTiet] if r.MaChiTiet in existing.index else None
         rows.append(
             {
-                "Mã TB": r.Title,
+                "Mã chi tiết": r.MaChiTiet,
                 "Tên thiết bị": r.TenThietBi,
-                "ĐVT": r.DonViTinh,
-                "SL sổ sách": int(r.SoLuong),
-                "SL thực tế": int(old["SoLuongThucTe"]) if old is not None else int(r.SoLuong),
-                "Tình trạng": (old["TinhTrang"] if old is not None else r.TinhTrang) or "Tốt",
+                "Đặc điểm": r.DacDiem,
+                "Serial": r.TenPhongBan,
+                "Có mặt": bool(old["SoLuongThucTe"]) if old is not None else True,
+                "Tình trạng": (old["TinhTrang"] if old is not None else r.TinhTrang) or "Bình thường",
                 "Ghi chú": old["GhiChu"] if old is not None else "",
                 "Đã kiểm": old is not None,
             }
         )
     editor_df = pd.DataFrame(rows)
 
-    st.caption("Nhập số lượng thực tế và tình trạng, sau đó bấm **Lưu kết quả kiểm kê**.")
+    st.caption("Bỏ tick **Có mặt** nếu không tìm thấy thiết bị, chọn tình trạng thực tế rồi bấm **Lưu kết quả kiểm kê**.")
     edited = st.data_editor(
         editor_df,
         key=f"{key}_editor_{dot}_{room}",
         hide_index=True,
         width="stretch",
-        disabled=["Mã TB", "Tên thiết bị", "ĐVT", "SL sổ sách", "Đã kiểm"],
+        disabled=["Mã chi tiết", "Tên thiết bị", "Đặc điểm", "Serial", "Đã kiểm"],
         column_config={
-            "SL thực tế": st.column_config.NumberColumn(min_value=0, step=1),
-            "Tình trạng": st.column_config.SelectboxColumn(options=schema.TINH_TRANG, required=True),
+            "Có mặt": st.column_config.CheckboxColumn(),
+            "Tình trạng": st.column_config.SelectboxColumn(options=status_opts, required=True),
             "Đã kiểm": st.column_config.CheckboxColumn(help="Đã có kết quả trong đợt này"),
         },
     )
-    diff = edited["SL thực tế"] - edited["SL sổ sách"]
-    if (diff != 0).any():
-        st.warning(f"Có {(diff != 0).sum()} thiết bị chênh lệch giữa sổ sách và thực tế.")
+    missing = int((~edited["Có mặt"]).sum())
+    if missing:
+        st.warning(f"Có {missing} thiết bị không tìm thấy trong phòng.")
 
     update_status = allow_update_status and st.checkbox(
-        "Cập nhật tình trạng mới vào danh mục thiết bị", value=True, key=f"{key}_upd"
+        "Cập nhật tình trạng mới vào danh sách thiết bị", value=True, key=f"{key}_upd"
     )
     if st.button("Lưu kết quả kiểm kê", type="primary", icon=":material/save:", key=f"{key}_save"):
-        tb_by_code = tb.set_index("Title")
+        tb_by_code = tb.set_index("MaChiTiet")
         with st.spinner("Đang lưu..."):
-            for row in edited.itertuples(index=False):
-                code = row[0]
+            for row in edited.to_dict("records"):
+                code = row["Mã chi tiết"]
                 fields = {
                     "Title": code,
-                    "TenThietBi": row[1],
+                    "TenThietBi": row["Tên thiết bị"],
                     "MaPhong": room,
                     "DotKiemKe": dot,
-                    "SoLuongSoSach": row[3],
-                    "SoLuongThucTe": row[4],
-                    "TinhTrang": row[5],
-                    "GhiChu": row[6],
+                    "SoLuongSoSach": 1,
+                    "SoLuongThucTe": 1 if row["Có mặt"] else 0,
+                    "TinhTrang": row["Tình trạng"],
+                    "GhiChu": row["Ghi chú"],
                     "NguoiKiemKe": user.email,
                     "NgayKiemKe": date.today(),
                 }
@@ -112,8 +113,8 @@ def render(user: CurrentUser, rooms: list[str], key: str, allow_update_status: b
                     storage.update(schema.KIEM_KE, existing.loc[code, "id"], fields)
                 else:
                     storage.create(schema.KIEM_KE, fields)
-                if update_status and tb_by_code.loc[code, "TinhTrang"] != row[5]:
-                    storage.update(schema.THIET_BI, tb_by_code.loc[code, "id"], {"TinhTrang": row[5]})
+                if update_status and tb_by_code.loc[code, "TinhTrang"] != row["Tình trạng"]:
+                    storage.update(schema.THIET_BI, tb_by_code.loc[code, "id"], {"TinhTrang": row["Tình trạng"]})
         st.session_state[f"{key}_dot_pending"] = dot
-        ui.flash(f"Đã lưu kết quả kiểm kê phòng {labels.get(room, room)} – {dot}.")
+        ui.flash(f"Đã lưu kết quả kiểm kê {labels.get(room, room)} – {dot}.")
         st.rerun()

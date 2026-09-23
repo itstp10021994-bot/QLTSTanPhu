@@ -17,35 +17,43 @@ def build_demo_data() -> dict:
          "ChucDanh": "Phó Hiệu trưởng"},
     ]
     phong = [
-        {"Title": "A101", "TenPhong": "Lớp 6A1", "KhuVuc": "Dãy A",
+        {"Title": "L1_PH103", "TenPhong": "Phòng học 103", "KhuVuc": "Lầu 1",
          "NguoiQuanLy": "gv1@demo.local", "TenNguoiQuanLy": "Phạm Thị Mai"},
-        {"Title": "A102", "TenPhong": "Lớp 6A2", "KhuVuc": "Dãy A",
+        {"Title": "L1_PH104", "TenPhong": "Phòng học 104", "KhuVuc": "Lầu 1",
          "NguoiQuanLy": "gv1@demo.local", "TenNguoiQuanLy": "Phạm Thị Mai"},
-        {"Title": "B201", "TenPhong": "Phòng Tin học 1", "KhuVuc": "Dãy B",
+        {"Title": "Trệt_PH001", "TenPhong": "Phòng học 001", "KhuVuc": "Tầng trệt",
          "NguoiQuanLy": "gv2@demo.local", "TenNguoiQuanLy": "Hoàng Minh Tuấn"},
-        {"Title": "B202", "TenPhong": "Phòng thí nghiệm Hóa", "KhuVuc": "Dãy B",
+        {"Title": "Trệt_HOA", "TenPhong": "Phòng thí nghiệm Hóa", "KhuVuc": "Tầng trệt",
          "NguoiQuanLy": "gv2@demo.local", "TenNguoiQuanLy": "Hoàng Minh Tuấn"},
-        {"Title": "KHO", "TenPhong": "Kho thiết bị", "KhuVuc": "Dãy C",
+        {"Title": "Kho_TB", "TenPhong": "Kho thiết bị", "KhuVuc": "Tầng trệt",
          "NguoiQuanLy": "qlts@demo.local", "TenNguoiQuanLy": "Nguyễn Văn Tài"},
     ]
-    tb = [
-        ("TB0001", "Tivi Samsung 65 inch", "Thiết bị CNTT", "A101", 1, "Cái", 15_000_000, 2023, "Tốt"),
-        ("TB0002", "Bàn học sinh 2 chỗ", "Bàn ghế - Nội thất", "A101", 20, "Bàn", 1_200_000, 2021, "Tốt"),
-        ("TB0003", "Quạt trần", "Thiết bị điện", "A101", 4, "Cái", 800_000, 2020, "Hư hỏng nhẹ"),
-        ("TB0001", "Tivi Samsung 65 inch", "Thiết bị CNTT", "A102", 1, "Cái", 15_000_000, 2023, "Tốt"),
-        ("TB0002", "Bàn học sinh 2 chỗ", "Bàn ghế - Nội thất", "A102", 20, "Bàn", 1_200_000, 2021, "Tốt"),
-        ("TB0010", "Máy tính để bàn Dell", "Thiết bị CNTT", "B201", 35, "Bộ", 12_000_000, 2022, "Tốt"),
-        ("TB0011", "Máy chiếu Epson", "Thiết bị CNTT", "B201", 1, "Máy", 9_500_000, 2019, "Hư hỏng nặng"),
-        ("TB0020", "Bộ dụng cụ thí nghiệm Hóa 10", "Thiết bị thí nghiệm", "B202", 10, "Bộ", 2_500_000, 2022, "Tốt"),
-        ("TB0021", "Tủ hút khí độc", "Thiết bị thí nghiệm", "B202", 1, "Cái", 35_000_000, 2022, "Tốt"),
-        ("TB0030", "Ghế xoay văn phòng", "Bàn ghế - Nội thất", "KHO", 12, "Chiếc", 900_000, 2020, "Chờ thanh lý"),
+    managers = {p["Title"]: p["NguoiQuanLy"] for p in phong}
+    # (Mã tài sản, Tên thiết bị/Chi tiết, Đặc điểm, Serial, Nơi sử dụng, Tình trạng, Mã SAP, Giá trị, Ngày mua)
+    units = [
+        ("111007", "Tivi BGH", "Samsung 65inch, UA65NU7100", "05SK3NNK70118", "L1_PH103", "Bình thường", "T000766001", 15_000_000, "2022-08-15"),
+        ("111027", "Điện thoại", "Oppo, 6GB, F9", "", "Thanh lý", "Cần thanh lý", "", 5_000_000, "2019-06-01"),
+        ("111028", "Máy chiếu", "Epson, 1024x768, EB-530", "VFQF610018L", "Trệt_PH001", "Bình thường", "T000816001", 12_000_000, "2021-08-20"),
+        ("111028", "Máy chiếu", "Epson, 1024x768, EB-530", "VFQF980117L", "L1_PH103", "Bình thường", "T000816001", 12_000_000, "2021-08-20"),
+        ("111028", "Máy chiếu", "Epson, 1024x768, EB-530", "X4J7910026", "Trệt_HOA", "Bình thường", "T000817001", 12_000_000, "2021-08-20"),
+        ("111028", "Máy chiếu", "Epson, 1280x800, EB-955WH", "VFQF670219L", "L1_PH104", "Mới", "T000817001", 18_000_000, "2024-08-10"),
+        ("111028", "Máy chiếu", "Panasonic, 1024x768, PT-LB386", "", "Kho_TB", "Cần kiểm tra", "T000215007", 11_000_000, "2020-09-01"),
+        ("111032", "Máy chấm công", "ZKTeco, MB80-SL", "", "Trệt_PH001", "Bình thường", "T002172001", 4_500_000, "2023-08-22"),
+        ("111032", "Máy chấm công", "ZKTeco, MB80-SL", "", "L1_PH104", "Bình thường", "T002172002", 4_500_000, "2023-08-22"),
+        ("111036", "Máy Tính Xách Tay", "Dell, 16RAM - 512 SSD", "", "Kho_TB", "Mới", "T000231002", 22_000_000, "2023-11-01"),
     ]
-    thiet_bi = [
-        {"Title": t[0], "TenThietBi": t[1], "LoaiThietBi": t[2], "MaPhong": t[3], "SoLuong": t[4],
-         "DonViTinh": t[5], "NguyenGia": t[6], "NamSuDung": t[7], "TinhTrang": t[8],
-         "NgayNhap": f"{t[7]}-08-15T00:00:00Z", "NguonGoc": "Ngân sách", "GhiChu": ""}
-        for t in tb
-    ]
+    counters: dict[str, int] = {}
+    thiet_bi = []
+    for i, u in enumerate(units, start=1):
+        counters[u[0]] = counters.get(u[0], 0) + 1
+        thiet_bi.append({
+            "STT": i, "MaTaiSan": u[0], "MaChiTiet": f"{u[0]}-{counters[u[0]]:05d}", "ChiTiet": u[1],
+            "DacDiem": u[2], "TenPhongBan": u[3], "DVT": "Cái", "SL": None, "NoiSuDung": u[4],
+            "NguoiSuDung": managers.get(u[4], ""), "NgayMua": u[8] + "T00:00:00+07:00",
+            "QuanLyThietBi": "Nguyễn Văn Tài", "TinhTrang": u[5], "QuanLyPhong": managers.get(u[4], ""),
+            "PhanQuyenTB": "admin", "MaSAP": u[6], "ThoiHanBaoHanh": "", "GhiChu": "", "TenThietBi": u[1],
+            "GiaTri": u[7], "NgayHoaDon": "", "NhomThietBi": "Nhóm Công Nghệ Thông Tin", "Mail": "",
+        })
 
     def with_ids(rows):
         return [{**r, "id": str(i)} for i, r in enumerate(rows, start=1)]

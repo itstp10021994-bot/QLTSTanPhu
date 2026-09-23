@@ -72,12 +72,18 @@ def show_table(df: pd.DataFrame, list_name: str, columns: list[str] | None = Non
     """Hiển thị bảng với nhãn cột tiếng Việt."""
     columns = columns or schema.columns_of(list_name)
     view = df[columns].rename(columns=schema.labels_of(list_name))
-    st.dataframe(view, hide_index=True, width="stretch", **kwargs)
+    config = {label: st.column_config.NumberColumn(label, format="localized")
+              for col, label in schema.labels_of(list_name).items()
+              if col in columns and schema.column_type(list_name, col) == "number"}
+    st.dataframe(view, hide_index=True, width="stretch", column_config=config, **kwargs)
 
 
 def room_label_map() -> dict[str, str]:
-    phong = storage.load(schema.PHONG)
-    return {r.Title: f"{r.Title} - {r.TenPhong}" if r.TenPhong else r.Title for r in phong.itertuples()}
+    """Mã phòng -> nhãn hiển thị; gồm cả các "Nơi sử dụng" chưa có trong danh mục phòng."""
+    from . import thietbi
+
+    phong = storage.load(schema.PHONG).set_index("Title")["TenPhong"].to_dict()
+    return {r: f"{r} - {phong[r]}" if phong.get(r) else r for r in thietbi.all_rooms()}
 
 
 def to_excel(sheets: dict[str, pd.DataFrame]) -> bytes:
@@ -88,24 +94,29 @@ def to_excel(sheets: dict[str, pd.DataFrame]) -> bytes:
     return buf.getvalue()
 
 
+TB_VIEW = ["MaChiTiet", "TenThietBi", "DacDiem", "TenPhongBan", "NoiSuDung", "NguoiSuDung",
+           "TinhTrang", "MaSAP", "GiaTri", "NgayMua"]
+TB_SEARCH = ["MaChiTiet", "MaTaiSan", "TenThietBi", "ChiTiet", "DacDiem", "TenPhongBan", "MaSAP", "NguoiSuDung"]
+
+
 def equipment_filters(df: pd.DataFrame, key: str, rooms: list[str] | None = None) -> pd.DataFrame:
-    """Bộ lọc tìm kiếm thiết bị (từ khóa, phòng, loại, tình trạng)."""
+    """Bộ lọc tìm kiếm thiết bị (từ khóa, nơi sử dụng, nhóm, tình trạng)."""
     labels = room_label_map()
     c1, c2, c3, c4 = st.columns([2, 1.3, 1.3, 1.3])
-    kw = c1.text_input("Tìm kiếm (mã / tên thiết bị)", key=f"{key}_kw")
-    room_opts = rooms if rooms is not None else sorted(set(df["MaPhong"]) - {""})
-    sel_rooms = c2.multiselect("Phòng", room_opts, key=f"{key}_room", format_func=lambda r: labels.get(r, r))
-    sel_types = c3.multiselect("Loại", schema.LOAI_THIET_BI, key=f"{key}_type")
-    sel_state = c4.multiselect("Tình trạng", schema.TINH_TRANG, key=f"{key}_state")
+    kw = c1.text_input("Tìm kiếm (mã, tên, đặc điểm, serial, mã SAP...)", key=f"{key}_kw")
+    room_opts = rooms if rooms is not None else sorted(set(df["NoiSuDung"]) - {""})
+    sel_rooms = c2.multiselect("Nơi sử dụng", room_opts, key=f"{key}_room", format_func=lambda r: labels.get(r, r))
+    sel_groups = c3.multiselect("Nhóm thiết bị", sorted(set(df["NhomThietBi"]) - {""}), key=f"{key}_group")
+    sel_state = c4.multiselect("Tình trạng", sorted(set(df["TinhTrang"]) - {""}), key=f"{key}_state")
     if kw:
-        mask = df["Title"].str.contains(kw, case=False, regex=False) | df["TenThietBi"].str.contains(
-            kw, case=False, regex=False
-        )
+        mask = pd.Series(False, index=df.index)
+        for col in TB_SEARCH:
+            mask |= df[col].str.contains(kw, case=False, regex=False)
         df = df[mask]
     if sel_rooms:
-        df = df[df["MaPhong"].isin(sel_rooms)]
-    if sel_types:
-        df = df[df["LoaiThietBi"].isin(sel_types)]
+        df = df[df["NoiSuDung"].isin(sel_rooms)]
+    if sel_groups:
+        df = df[df["NhomThietBi"].isin(sel_groups)]
     if sel_state:
         df = df[df["TinhTrang"].isin(sel_state)]
     return df

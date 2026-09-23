@@ -71,7 +71,8 @@ def _login_screen_demo() -> None:
     )
     pq = storage.load(schema.PHAN_QUYEN)
     phong = storage.load(schema.PHONG)
-    options = sorted((set(pq["Title"]) | set(phong["NguoiQuanLy"]) | admin_emails()) - {""})
+    tb = storage.load(schema.THIET_BI)
+    options = sorted((set(pq["Title"]) | set(phong["NguoiQuanLy"]) | set(tb["QuanLyPhong"]) | admin_emails()) - {""})
     with st.form("demo_login"):
         email = st.selectbox("Chọn tài khoản", options, index=None, placeholder="Chọn email...")
         other = st.text_input("Hoặc nhập email khác")

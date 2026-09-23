@@ -1,7 +1,7 @@
 """Tầng lưu trữ dữ liệu.
 
-- ``SharePointStore``: đọc/ghi SharePoint List qua Microsoft Graph API
-  (xác thực app-only bằng client credentials).
+- ``SharePointStore``: đọc/ghi SharePoint List qua Microsoft Graph API. Cột được dò
+  tự động theo tên hiển thị (xem ``schema.LISTS``), nên dùng được list có sẵn.
 - ``LocalStore``: lưu vào file JSON cục bộ, dùng cho chế độ demo khi chưa
   cấu hình SharePoint.
 
@@ -12,17 +12,20 @@ Mọi trang đều dùng các hàm ``load()``, ``create()``, ``update()``, ``del
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
-from datetime import date, datetime
+import unicodedata
+from datetime import date, datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 import streamlit as st
 
 from . import schema
-from .config import sharepoint_config
+from .config import app_setting, sharepoint_config
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 
@@ -31,18 +34,70 @@ class StorageError(RuntimeError):
     pass
 
 
-def _to_sp_value(list_name: str, col: str, value):
-    """Chuẩn hóa giá trị Python trước khi ghi."""
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+class TokenExpired(StorageError):
+    """Token đăng nhập của người dùng đã hết hạn (chế độ delegated)."""
+
+
+def _tz() -> ZoneInfo:
+    return ZoneInfo(app_setting("timezone", "Asia/Ho_Chi_Minh"))
+
+
+def _is_blank(value) -> bool:
+    return value is None or (isinstance(value, float) and pd.isna(value)) or value == ""
+
+
+def _as_date(value) -> date | None:
+    if _is_blank(value):
+        return None
+    if isinstance(value, (datetime, pd.Timestamp)):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return None
+
+
+def date_to_sp(value) -> str | None:
+    """Ngày -> chuỗi UTC SharePoint lưu (0h theo giờ Việt Nam)."""
+    d = _as_date(value)
+    if d is None:
+        return None
+    local = datetime(d.year, d.month, d.day, tzinfo=_tz())
+    return local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def date_from_sp(value) -> str:
+    """Giá trị ngày đọc từ SharePoint -> 'YYYY-MM-DD' theo giờ Việt Nam.
+
+    SharePoint trả thời điểm UTC (ngày 22/8 lưu thành 2023-08-21T17:00:00Z), nên phải đổi múi giờ.
+    Nếu cột là văn bản (vd "8/22/2023") thì giữ nguyên chuỗi.
+    """
+    if _is_blank(value):
+        return ""
+    text = str(value).strip()
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if dt.tzinfo is None:
+        return dt.date().isoformat()
+    return dt.astimezone(_tz()).date().isoformat()
+
+
+def _normalize(name: str) -> str:
+    text = unicodedata.normalize("NFC", str(name)).strip().lower()
+    return re.sub(r"\s+", " ", text)
+
+
+def _plain_value(list_name: str, col: str, value):
+    """Chuẩn hóa giá trị theo kiểu khai báo trong schema (dùng cho LocalStore)."""
+    if _is_blank(value):
         return None
     kind = schema.column_type(list_name, col)
     if kind == "date":
-        if isinstance(value, (datetime, pd.Timestamp)):
-            value = value.date()
-        if isinstance(value, date):
-            return value.isoformat() + "T00:00:00Z"
-        text = str(value).strip()
-        return f"{text[:10]}T00:00:00Z" if text else None
+        return date_to_sp(value)
     if kind == "number":
         try:
             return float(value)
@@ -54,10 +109,6 @@ def _to_sp_value(list_name: str, col: str, value):
 # ---------------------------------------------------------------------------
 # SharePoint (Microsoft Graph)
 # ---------------------------------------------------------------------------
-class TokenExpired(StorageError):
-    """Token đăng nhập của người dùng đã hết hạn (chế độ delegated)."""
-
-
 class SharePointStore:
     def __init__(self, cfg: dict, token_provider=None):
         """``token_provider``: hàm trả về access token Graph. Bỏ trống -> dùng
@@ -65,10 +116,11 @@ class SharePointStore:
         self.cfg = cfg
         self._token_provider = token_provider or self._app_token_provider(cfg)
         self._site_id: str | None = None
-        # Tên list thật trên SharePoint, ví dụ {"ThietBi": "DS_ThietBi"}
+        # Tên list thật trên SharePoint, ví dụ {"ThietBi": "Data_Thietbichitiet"}
         self.list_names: dict = cfg.get("lists", {})
-        # Ánh xạ cột: {"ThietBi": {"TenThietBi": "TenTB"}}
+        # Ánh xạ cột cố định: {"ThietBi": {"TenThietBi": "TenTB"}} (tên nội bộ hoặc tên hiển thị)
         self.column_map: dict = cfg.get("columns", {})
+        self._columns: dict[str, dict] = {}
 
     @staticmethod
     def _app_token_provider(cfg: dict):
@@ -123,37 +175,105 @@ class SharePointStore:
             self._site_id = self._request("GET", f"/sites/{self.cfg['hostname']}:{path}")["id"]
         return self._site_id
 
+    def real_list_name(self, list_name: str) -> str:
+        return self.list_names.get(list_name) or schema.LISTS[list_name]["sp_list"]
+
     def _list_url(self, list_name: str) -> str:
-        real = self.list_names.get(list_name, list_name)
-        return f"/sites/{self.site_id}/lists/{requests.utils.quote(real)}"
+        return f"/sites/{self.site_id}/lists/{requests.utils.quote(self.real_list_name(list_name))}"
+
+    # -- Dò cột --
+    def sp_columns(self, list_name: str) -> list[dict]:
+        return self._request("GET", f"{self._list_url(list_name)}/columns")["value"]
+
+    def columns(self, list_name: str) -> dict:
+        """Khóa app -> {"name": tên nội bộ, "kind": kiểu SharePoint, "readonly": bool}.
+        Cột không tìm thấy thì không có trong kết quả."""
+        if list_name in self._columns:
+            return self._columns[list_name]
+        sp_cols = self.sp_columns(list_name)
+        by_name = {c["name"]: c for c in sp_cols}
+        by_display = {}
+        for c in sp_cols:
+            by_display.setdefault(_normalize(c.get("displayName", "")), c)
+        overrides = self.column_map.get(list_name, {})
+        resolved = {}
+        for key, spec in schema.LISTS[list_name]["columns"].items():
+            candidates = [overrides.get(key), spec.get("sp"), key, spec["label"]]
+            for cand in filter(None, candidates):
+                col = by_name.get(cand) or by_display.get(_normalize(cand))
+                if col:
+                    kind = next((k for k in ("text", "number", "currency", "dateTime", "choice", "boolean",
+                                             "personOrGroup", "lookup", "calculated") if k in col), "text")
+                    resolved[key] = {
+                        "name": col["name"],
+                        "kind": kind,
+                        "readonly": bool(col.get("readOnly")) or kind in ("personOrGroup", "lookup", "calculated"),
+                    }
+                    break
+        self._columns[list_name] = resolved
+        return resolved
+
+    def _encode(self, list_name: str, key: str, value):
+        col = self.columns(list_name).get(key)
+        if not col or col["readonly"]:
+            return None, None
+        kind = col["kind"]
+        if _is_blank(value):
+            return col["name"], None
+        if kind == "dateTime":
+            return col["name"], date_to_sp(value)
+        if kind in ("number", "currency"):
+            try:
+                return col["name"], float(value)
+            except (TypeError, ValueError):
+                return col["name"], None
+        if kind == "boolean":
+            return col["name"], bool(value)
+        if schema.column_type(list_name, key) == "date":
+            d = _as_date(value)
+            return col["name"], d.strftime("%d/%m/%Y") if d else str(value)
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        return col["name"], str(value)
 
     def _to_sp(self, list_name: str, fields: dict) -> dict:
-        mapping = self.column_map.get(list_name, {})
-        return {mapping.get(k, k): _to_sp_value(list_name, k, v) for k, v in fields.items()}
-
-    def _from_sp(self, list_name: str, fields: dict) -> dict:
-        reverse = {v: k for k, v in self.column_map.get(list_name, {}).items()}
-        return {reverse.get(k, k): v for k, v in fields.items()}
+        out = {}
+        for key, value in fields.items():
+            name, encoded = self._encode(list_name, key, value)
+            if name:
+                out[name] = encoded
+        return out
 
     # -- CRUD --
     def list_items(self, list_name: str) -> list[dict]:
-        url = f"{self._list_url(list_name)}/items?$expand=fields&$top=999"
+        cols = self.columns(list_name)
+        select = ",".join(sorted({c["name"] for c in cols.values()} | {"id"}))
+        url = f"{self._list_url(list_name)}/items?$expand=fields($select={select})&$top=999"
+        reverse = {c["name"]: key for key, c in cols.items()}
         rows = []
         while url:
             data = self._request("GET", url)
             for item in data.get("value", []):
-                row = self._from_sp(list_name, item.get("fields", {}))
+                fields = item.get("fields", {})
+                row = {reverse[k]: v for k, v in fields.items() if k in reverse}
                 row["id"] = str(item["id"])
                 rows.append(row)
             url = data.get("@odata.nextLink")
         return rows
 
     def create(self, list_name: str, fields: dict) -> str:
-        item = self._request("POST", f"{self._list_url(list_name)}/items", json={"fields": self._to_sp(list_name, fields)})
+        payload = self._to_sp(list_name, fields)
+        cols = self.columns(list_name)
+        if "Title" not in payload and not any(c["name"] == "Title" for c in cols.values()):
+            # Cột Title bắt buộc mặc định nhưng không dùng trong app: điền mã để dễ tra cứu
+            payload["Title"] = str(fields.get("MaChiTiet") or next((v for v in fields.values() if v), ""))[:255]
+        item = self._request("POST", f"{self._list_url(list_name)}/items", json={"fields": payload})
         return str(item["id"])
 
     def update(self, list_name: str, item_id: str, fields: dict) -> None:
-        self._request("PATCH", f"{self._list_url(list_name)}/items/{item_id}/fields", json=self._to_sp(list_name, fields))
+        payload = self._to_sp(list_name, fields)
+        if payload:
+            self._request("PATCH", f"{self._list_url(list_name)}/items/{item_id}/fields", json=payload)
 
     def delete(self, list_name: str, item_id: str) -> None:
         self._request("DELETE", f"{self._list_url(list_name)}/items/{item_id}")
@@ -167,11 +287,20 @@ class LocalStore:
 
     def __init__(self, path: Path):
         self.path = path
-        if not path.exists():
+        if not path.exists() or schema.THIET_BI not in self._read_safe():
             from .demo_data import build_demo_data
 
             path.parent.mkdir(parents=True, exist_ok=True)
             self._write(build_demo_data())
+
+    def _read_safe(self) -> dict:
+        try:
+            data = self._read()
+        except (OSError, ValueError):
+            return {}
+        # dữ liệu demo kiểu cũ (trước khi đổi sang Data_Thietbichitiet) -> tạo lại
+        rows = data.get(schema.THIET_BI, [])
+        return data if not rows or "MaChiTiet" in rows[0] else {}
 
     def _read(self) -> dict:
         return json.loads(self.path.read_text(encoding="utf-8"))
@@ -188,7 +317,7 @@ class LocalStore:
             data = self._read()
             rows = data.setdefault(list_name, [])
             new_id = str(max((int(r["id"]) for r in rows), default=0) + 1)
-            rows.append({**{k: _to_sp_value(list_name, k, v) for k, v in fields.items()}, "id": new_id})
+            rows.append({**{k: _plain_value(list_name, k, v) for k, v in fields.items()}, "id": new_id})
             self._write(data)
             return new_id
 
@@ -197,7 +326,7 @@ class LocalStore:
             data = self._read()
             for row in data.get(list_name, []):
                 if row["id"] == str(item_id):
-                    row.update({k: _to_sp_value(list_name, k, v) for k, v in fields.items()})
+                    row.update({k: _plain_value(list_name, k, v) for k, v in fields.items()})
             self._write(data)
 
     def delete(self, list_name: str, item_id: str) -> None:
@@ -247,9 +376,7 @@ def empty_frame(list_name: str) -> pd.DataFrame:
     return pd.DataFrame({c: pd.Series(dtype=str) for c in ["id", *schema.columns_of(list_name)]})
 
 
-@st.cache_data(ttl=120, show_spinner="Đang tải dữ liệu...")
-def _load(list_name: str, scope: str) -> pd.DataFrame:  # noqa: ARG001 - scope là khóa cache
-    rows = get_store().list_items(list_name)
+def _to_frame(list_name: str, rows: list[dict]) -> pd.DataFrame:
     cols = ["id", *schema.columns_of(list_name)]
     df = pd.DataFrame(rows)
     for col in cols:
@@ -261,16 +388,28 @@ def _load(list_name: str, scope: str) -> pd.DataFrame:  # noqa: ARG001 - scope l
         if kind == "number":
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
         elif kind == "date":
-            df[col] = df[col].map(lambda v: str(v)[:10] if v else "")
+            df[col] = df[col].map(date_from_sp)
         else:
-            df[col] = df[col].fillna("").astype(str)
+            df[col] = df[col].map(lambda v: "" if _is_blank(v) else (
+                str(int(v)) if isinstance(v, float) and v.is_integer() else str(v)
+            ))
     df["id"] = df["id"].astype(str)
     return df
+
+
+@st.cache_data(ttl=120, show_spinner="Đang tải dữ liệu...")
+def _load(list_name: str, scope: str) -> pd.DataFrame:  # noqa: ARG001 - scope là khóa cache
+    return _to_frame(list_name, get_store().list_items(list_name))
 
 
 def load(list_name: str) -> pd.DataFrame:
     """DataFrame các mục của list (cột ``id`` là ID item SharePoint)."""
     return _load(list_name, _cache_scope()).copy()
+
+
+def load_fresh(list_name: str) -> pd.DataFrame:
+    """Đọc thẳng từ SharePoint, bỏ qua bộ nhớ đệm (dùng khi sinh mã mới)."""
+    return _to_frame(list_name, get_store().list_items(list_name))
 
 
 def refresh() -> None:

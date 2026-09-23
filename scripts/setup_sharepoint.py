@@ -30,7 +30,7 @@ def main() -> None:
     if not cfg.get("client_secret"):
         sys.exit("Không có client_secret: hãy dùng trang 'Khởi tạo SharePoint' trong ứng dụng.")
     store = SharePointStore(cfg)
-    for line in ensure_lists(store):
+    for line in ensure_lists(store, add_columns_to=set(schema.LISTS) - {schema.THIET_BI}):
         print("-", line)
 
     if args.seed_admin:

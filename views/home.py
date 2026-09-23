@@ -1,6 +1,6 @@
 import streamlit as st
 
-from qlts import auth, schema, storage, ui
+from qlts import auth, schema, storage, thietbi, ui
 
 user = auth.require()
 
@@ -15,16 +15,14 @@ with st.container(border=True):
     c2.markdown(f"**{user.chuc_danh}**")
 
 tb = storage.load(schema.THIET_BI)
-phong = storage.load(schema.PHONG)
-my_rooms = phong[phong["NguoiQuanLy"].str.strip().str.lower() == user.email]
-my_tb = tb[tb["MaPhong"].isin(my_rooms["Title"])]
+my_rooms = thietbi.rooms_managed_by(user.email)
+my_tb = tb[tb["NoiSuDung"].isin(my_rooms)]
 
 st.write("")
 m1, m2, m3 = st.columns(3)
 m1.metric("Phòng bạn đang quản lý", len(my_rooms), border=True)
-m2.metric("Số đầu thiết bị trong các phòng", len(my_tb), border=True)
-m3.metric("Thiết bị cần sửa chữa / thanh lý",
-          int((~my_tb["TinhTrang"].isin(["Tốt", "", "Đã thanh lý"])).sum()), border=True)
+m2.metric("Thiết bị trong các phòng", len(my_tb), border=True)
+m3.metric("Thiết bị cần xử lý", int(thietbi.needs_attention(my_tb).sum()), border=True)
 
 if user.roles:
     st.caption("Vai trò: " + ", ".join(sorted(user.roles)))

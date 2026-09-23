@@ -7,39 +7,49 @@ Phiên bản Python (Streamlit) của app Power Apps **STP_Thietbi**. Dữ liệ
 
 | Nhóm | Chức năng | Ai thấy |
 |---|---|---|
-| Ban quản lý tài sản | Nhập mới thiết bị · Chỉnh sửa thông tin thiết bị (sửa/xóa) · Điều chuyển thiết bị (có lịch sử) | Quản trị, Ban quản lý tài sản |
-| Ban kiểm kê | Kiểm kê theo đợt / phòng, xem kết quả, lọc chênh lệch, xuất Excel | Quản trị, Ban kiểm kê |
+| Ban quản lý tài sản | Nhập mới thiết bị (tự sinh Mã chi tiết) · Chỉnh sửa thông tin thiết bị (sửa/xóa) · Điều chuyển nhiều thiết bị (có lịch sử) | Quản trị, Ban quản lý tài sản |
+| Ban kiểm kê | Kiểm kê theo đợt / phòng (tick có mặt, tình trạng), xem kết quả, lọc thiết bị không thấy, xuất Excel | Quản trị, Ban kiểm kê |
 | Người dùng | Danh sách Phòng đang quản lý · Kiểm kê phòng mình phụ trách | Mọi người đăng nhập |
 | Báo cáo | Báo cáo tổng quan BGH: số liệu, biểu đồ, tiến độ kiểm kê, thiết bị hỏng, xuất Excel | Quản trị, BGH, Ban quản lý tài sản |
 | Phân quyền | Phân quyền admin (vai trò) · Phân quyền quản lý phòng (danh mục phòng + người phụ trách) · Khởi tạo SharePoint | Quản trị |
 
 ## Cấu trúc SharePoint List
 
-Mỗi list dùng cột mặc định **Title** làm mã. Các cột khác (tên nội bộ, không dấu):
+**Thiết bị – dùng list có sẵn `Data_Thietbichitiet`** (mỗi dòng là một thiết bị). App tự dò cột theo **tên hiển thị**:
+STT, Mã tài sản, Mã chi tiết, Chi tiết, Đặc điểm, Tên phòng ban, ĐVT, SL, Nơi sử dụng, Người sử dụng, Ngày mua,
+Quản lý thiết bị, Tình trạng, Quản lý phòng, Phân quyền, Mã SAP, Thời hạn bảo hành, Ghi chú, Tên thiết bị, Giá trị,
+Ngày hóa đơn, Nhóm thiết bị, Mail.
+
+- **Mã chi tiết** tự sinh khi nhập mới: `<Mã tài sản>-<số>` với số = số lớn nhất đang có của mã tài sản đó + 1
+  (vd đang có `111028-00018` → tạo `111028-00019`). Nhập nhiều thiết bị cùng lúc sẽ tạo các mã liên tiếp.
+- **Nơi sử dụng** là phòng; **Quản lý phòng** (email) quyết định ai thấy phòng ở mục *Người dùng*.
+- Thiết bị có Nơi sử dụng = `Thanh lý` hoặc Tình trạng = `Đã thanh lý` không tính vào tài sản đang dùng.
+- Trang **Phân quyền → Khởi tạo SharePoint → Kiểm tra** cho biết từng cột đã khớp chưa.
+  Cột kiểu *Person/Lookup* chỉ đọc (app không ghi vào).
+
+**Các list app tự tạo** (nếu site chưa có) – dùng cột Title làm mã:
 
 | List | Title | Các cột |
 |---|---|---|
-| `ThietBi` | Mã thiết bị | TenThietBi, LoaiThietBi (choice), MaPhong, SoLuong (number), DonViTinh, NguyenGia (number), NamSuDung (number), NgayNhap (date), NguonGoc, TinhTrang (choice), GhiChu |
-| `Phong` | Mã phòng | TenPhong, KhuVuc, NguoiQuanLy (email), TenNguoiQuanLy |
-| `DieuChuyen` | Mã thiết bị | TenThietBi, TuPhong, DenPhong, SoLuong, NgayDieuChuyen, NguoiThucHien, LyDo |
-| `KiemKe` | Mã thiết bị | TenThietBi, MaPhong, DotKiemKe, SoLuongSoSach, SoLuongThucTe, TinhTrang, NguoiKiemKe, NgayKiemKe, GhiChu |
+| `Phong` | Mã phòng (= Nơi sử dụng) | TenPhong, KhuVuc, NguoiQuanLy (email), TenNguoiQuanLy |
+| `DieuChuyen` | Mã chi tiết | TenThietBi, TuPhong, DenPhong, SoLuong, NgayDieuChuyen, NguoiThucHien, LyDo |
+| `KiemKe` | Mã chi tiết | TenThietBi, MaPhong, DotKiemKe, SoLuongSoSach, SoLuongThucTe (1 = có mặt, 0 = không thấy), TinhTrang, NguoiKiemKe, NgayKiemKe, GhiChu |
 | `PhanQuyen` | Email | HoTen, VaiTro (Quản trị hệ thống / Ban quản lý tài sản / Ban kiểm kê / Ban giám hiệu), ChucDanh |
 
-Một mã thiết bị có thể có ở nhiều phòng (mỗi phòng một dòng). Điều chuyển một phần số lượng sẽ tách dòng
-hoặc cộng dồn vào phòng nhận.
-
-**Đã có list từ Power Apps với tên khác?** Không cần sửa code – khai báo ánh xạ trong secrets:
+**Tên list/cột khác mặc định?** Khai báo trong secrets, không cần sửa code:
 
 ```toml
 [sharepoint.lists]
-ThietBi = "DS_ThietBi"          # tên list thật
+ThietBi = "Data_Thietbichitiet"   # tên list thật
+Phong = "DS_Phong"
 
 [sharepoint.columns.ThietBi]
-TenThietBi = "TenTB"            # tên cột trong app = internal name trên SharePoint
-MaPhong = "Phong"
+TenPhongBan = "Số serial"          # khóa trong app = tên hiển thị hoặc tên nội bộ trên SharePoint
 ```
 
-(Xem internal name: mở List settings → bấm vào cột → phần `Field=` trên thanh địa chỉ.)
+Các khóa cột của list thiết bị: `STT, MaTaiSan, MaChiTiet, ChiTiet, DacDiem, TenPhongBan, DVT, SL, NoiSuDung,
+NguoiSuDung, NgayMua, QuanLyThietBi, TinhTrang, QuanLyPhong, PhanQuyenTB, MaSAP, ThoiHanBaoHanh, GhiChu,
+TenThietBi, GiaTri, NgayHoaDon, NhomThietBi, Mail`.
 
 ## Hai chế độ kết nối SharePoint
 
@@ -76,8 +86,9 @@ MaPhong = "Phong"
    - `[sharepoint]`: `hostname` và `site_path` của site chứa list
      (ví dụ `https://igc.sharepoint.com/sites/TanPhuThietBi` → hostname `igc.sharepoint.com`, site_path `/sites/TanPhuThietBi`).
    - `[app] admin_emails`: email của bạn.
-6. Mở app, đăng nhập, vào **Phân quyền → Khởi tạo SharePoint** → bấm *Kiểm tra & tạo list*
-   (cần quyền Owner trên site; list/dữ liệu có sẵn được giữ nguyên).
+6. Mở app, đăng nhập, vào **Phân quyền → Khởi tạo SharePoint**: bấm *Kiểm tra* để xem cột của
+   `Data_Thietbichitiet` đã khớp chưa, rồi *Tạo list còn thiếu* (cần quyền Owner; list/dữ liệu có sẵn được giữ nguyên).
+   Sau đó vào **Phân quyền quản lý phòng** → *Thêm tất cả vào danh mục* để tạo danh mục phòng từ các Nơi sử dụng.
 
 Token đăng nhập Microsoft hết hạn sau khoảng 1 giờ; khi đó app hiện nút **Đăng nhập lại** (một cú bấm).
 
@@ -124,6 +135,7 @@ app.py                  # khung app, menu theo quyền, header/footer
 qlts/schema.py          # định nghĩa list, cột, vai trò, danh mục lựa chọn
 qlts/storage.py         # SharePointStore (Graph API) + LocalStore (demo), cache
 qlts/auth.py            # đăng nhập Microsoft (st.login) / demo, phân quyền
+qlts/thietbi.py         # nghiệp vụ thiết bị: sinh mã chi tiết, phòng, người quản lý phòng
 qlts/kiemke.py          # màn hình kiểm kê dùng chung
 qlts/ui.py              # header, footer, bảng, bộ lọc, xuất Excel
 views/*.py              # từng chức năng trong menu

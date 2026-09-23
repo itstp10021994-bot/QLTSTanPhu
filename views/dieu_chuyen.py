@@ -2,70 +2,62 @@ from datetime import date
 
 import streamlit as st
 
-from qlts import auth, schema, storage, ui
+from qlts import auth, schema, storage, thietbi, ui
 
 user = auth.require(schema.ROLE_QLTS)
 st.subheader("Điều chuyển thiết bị")
 
 tb = storage.load(schema.THIET_BI)
 labels = ui.room_label_map()
+managers = thietbi.room_managers()
 rooms = list(labels)
 fmt = lambda r: labels.get(r, r)  # noqa: E731
 
-c1, c2 = st.columns(2)
-tu_phong = c1.selectbox("Từ phòng", rooms, format_func=fmt, key="dc_from")
-in_room = tb[(tb["MaPhong"] == tu_phong) & (tb["SoLuong"] > 0)]
+tu_phong = st.selectbox("Từ nơi sử dụng", rooms, format_func=fmt, key="dc_from")
+in_room = tb[(tb["NoiSuDung"] == tu_phong)].reset_index(drop=True)
 if in_room.empty:
-    st.info("Phòng này không có thiết bị để điều chuyển.")
+    st.info("Nơi này không có thiết bị.")
 else:
-    items = in_room.set_index("id")
+    st.caption("Chọn các thiết bị cần điều chuyển (tick ô đầu dòng):")
+    event = st.dataframe(
+        in_room[["MaChiTiet", "TenThietBi", "DacDiem", "TenPhongBan", "NguoiSuDung", "TinhTrang"]]
+        .rename(columns=schema.labels_of(schema.THIET_BI)),
+        hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"dc_sel_{tu_phong}",
+    )
+    chosen = in_room.iloc[event.selection.rows]
     with st.form("dieu_chuyen"):
-        item_id = st.selectbox(
-            "Thiết bị", list(items.index),
-            format_func=lambda i: f"{items.loc[i, 'Title']} – {items.loc[i, 'TenThietBi']} "
-                                  f"(còn {int(items.loc[i, 'SoLuong'])} {items.loc[i, 'DonViTinh']})",
-        )
         c1, c2, c3 = st.columns(3)
-        den_phong = c1.selectbox("Đến phòng", [r for r in rooms if r != tu_phong], format_func=fmt)
-        so_luong = c2.number_input("Số lượng điều chuyển", min_value=1, value=1, step=1)
+        dest_opts = [r for r in rooms if r != tu_phong] + [schema.NOI_THANH_LY]
+        den_phong = c1.selectbox("Đến nơi sử dụng", dest_opts, format_func=fmt, accept_new_options=True)
+        nguoi_sd = c2.text_input("Người sử dụng mới (email)", help="Để trống = người quản lý phòng nhận.")
         ngay = c3.date_input("Ngày điều chuyển", value=date.today(), format="DD/MM/YYYY")
-        ly_do = st.text_area("Lý do")
-        ok = st.form_submit_button("Xác nhận điều chuyển", type="primary", icon=":material/swap_horiz:")
+        ly_do = st.text_area("Lý do", height=68)
+        ok = st.form_submit_button(f"Điều chuyển {len(chosen)} thiết bị", type="primary",
+                                   icon=":material/swap_horiz:", disabled=chosen.empty)
 
     if ok:
-        src = items.loc[item_id]
-        if not den_phong:
-            st.error("Chọn phòng nhận.")
-        elif so_luong > src["SoLuong"]:
-            st.error(f"Số lượng điều chuyển vượt quá số lượng hiện có ({int(src['SoLuong'])}).")
-        else:
-            dest = tb[(tb["Title"] == src["Title"]) & (tb["MaPhong"] == den_phong)]
-            remaining = src["SoLuong"] - so_luong
-            if not dest.empty:
-                # Phòng nhận đã có thiết bị cùng mã: cộng dồn số lượng
-                d = dest.iloc[0]
-                storage.update(schema.THIET_BI, d["id"], {"SoLuong": d["SoLuong"] + so_luong})
-                if remaining > 0:
-                    storage.update(schema.THIET_BI, item_id, {"SoLuong": remaining})
-                else:
-                    storage.delete(schema.THIET_BI, item_id)
-            elif remaining > 0:
-                # Chuyển một phần: tách thành bản ghi mới ở phòng nhận
-                fields = {c: src[c] for c in schema.columns_of(schema.THIET_BI)}
-                fields.update({"MaPhong": den_phong, "SoLuong": so_luong})
-                storage.create(schema.THIET_BI, fields)
-                storage.update(schema.THIET_BI, item_id, {"SoLuong": remaining})
-            else:
-                storage.update(schema.THIET_BI, item_id, {"MaPhong": den_phong})
-            storage.create(schema.DIEU_CHUYEN, {
-                "Title": src["Title"], "TenThietBi": src["TenThietBi"], "TuPhong": tu_phong,
-                "DenPhong": den_phong, "SoLuong": so_luong, "NgayDieuChuyen": ngay,
-                "NguoiThucHien": user.email, "LyDo": ly_do,
-            })
-            ui.flash(f"Đã điều chuyển {so_luong} {src['DonViTinh']} {src['TenThietBi']} từ {tu_phong} sang {den_phong}.")
-            st.rerun()
+        den_phong = (den_phong or "").strip()
+        if not den_phong or den_phong == tu_phong:
+            st.error("Chọn nơi nhận khác nơi hiện tại.")
+            st.stop()
+        ql_moi = managers.get(den_phong, "")
+        with st.spinner("Đang cập nhật SharePoint..."):
+            for item in chosen.itertuples():
+                storage.update(schema.THIET_BI, item.id, {
+                    "NoiSuDung": den_phong,
+                    "QuanLyPhong": ql_moi or item.QuanLyPhong,
+                    "NguoiSuDung": nguoi_sd.strip().lower() or ql_moi or item.NguoiSuDung,
+                })
+                storage.create(schema.DIEU_CHUYEN, {
+                    "Title": item.MaChiTiet, "TenThietBi": item.TenThietBi, "TuPhong": tu_phong,
+                    "DenPhong": den_phong, "SoLuong": 1, "NgayDieuChuyen": ngay,
+                    "NguoiThucHien": user.email, "LyDo": ly_do,
+                })
+        ui.flash(f"Đã điều chuyển {len(chosen)} thiết bị từ {fmt(tu_phong)} sang {fmt(den_phong)}.")
+        st.rerun()
 
 st.divider()
 st.markdown("##### Lịch sử điều chuyển")
-dc = storage.load(schema.DIEU_CHUYEN).sort_values("NgayDieuChuyen", ascending=False)
-ui.show_table(dc, schema.DIEU_CHUYEN)
+dc = storage.load(schema.DIEU_CHUYEN).sort_values(["NgayDieuChuyen", "id"], ascending=False)
+ui.show_table(dc, schema.DIEU_CHUYEN, ["Title", "TenThietBi", "TuPhong", "DenPhong", "NgayDieuChuyen",
+                                       "NguoiThucHien", "LyDo"])
