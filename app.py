@@ -16,6 +16,9 @@ if logo:
 
 try:
     user = auth.current_user()
+except storage.TokenExpired:
+    auth.relogin_screen()
+    st.stop()
 except storage.StorageError as exc:
     st.error(f"Không kết nối được SharePoint: {exc}")
     st.stop()
@@ -53,6 +56,8 @@ if user.is_admin:
         page("phan_quyen_admin.py", "Phân quyền admin", ":material/admin_panel_settings:"),
         page("phan_quyen_phong.py", "Phân quyền quản lý phòng", ":material/manage_accounts:"),
     ]
+    if not storage.is_demo():
+        sections["Phân quyền"].append(page("khoi_tao_sharepoint.py", "Khởi tạo SharePoint", ":material/build:"))
 
 nav = st.navigation(sections)
 
@@ -67,9 +72,16 @@ with st.sidebar:
         auth.logout()
 
 ui.header(user.name)
+if st.session_state.get("startup_error"):
+    st.warning(
+        "Chưa đọc được dữ liệu phân quyền từ SharePoint. Nếu đây là lần đầu, quản trị viên hãy vào "
+        "**Phân quyền → Khởi tạo SharePoint** để tạo list.  \n" + st.session_state["startup_error"][:300]
+    )
 ui.show_flash()
 try:
     nav.run()
+except storage.TokenExpired:
+    auth.relogin_screen()
 except storage.StorageError as exc:
     st.error(f"Lỗi khi làm việc với SharePoint: {exc}")
 ui.footer()

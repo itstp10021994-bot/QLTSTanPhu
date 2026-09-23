@@ -14,16 +14,35 @@ def _secrets() -> dict:
 
 
 def sharepoint_config() -> dict | None:
-    """Trả về cấu hình SharePoint, hoặc ``None`` nếu chưa cấu hình (chế độ demo)."""
+    """Cấu hình SharePoint, hoặc ``None`` nếu chưa cấu hình (chế độ demo).
+
+    ``mode`` trong kết quả:
+    - ``"app"``: có client_secret -> ứng dụng tự truy cập (cần quản trị cấp quyền).
+    - ``"delegated"``: dùng quyền của chính người đang đăng nhập (không cần quản trị);
+      token lấy từ đăng nhập Microsoft ``[auth]``.
+    """
     sp = dict(_secrets().get("sharepoint", {}))
     for key in ("tenant_id", "client_id", "client_secret", "hostname", "site_path"):
         env = os.environ.get(f"SP_{key.upper()}")
         if env:
             sp[key] = env
-    required = ("tenant_id", "client_id", "client_secret", "hostname", "site_path")
-    if all(sp.get(k) for k in required):
+    if not (sp.get("hostname") and sp.get("site_path")):
+        return None
+    if all(sp.get(k) for k in ("tenant_id", "client_id", "client_secret")):
+        sp["mode"] = "app"
+        return sp
+    if delegated_available():
+        sp["mode"] = "delegated"
         return sp
     return None
+
+
+def delegated_available() -> bool:
+    """Đăng nhập Microsoft đã được cấu hình để trả về access token Microsoft Graph."""
+    expose = _secrets().get("auth", {}).get("expose_tokens", [])
+    if isinstance(expose, str):
+        expose = [expose]
+    return auth_configured() and "access" in expose
 
 
 def auth_configured() -> bool:

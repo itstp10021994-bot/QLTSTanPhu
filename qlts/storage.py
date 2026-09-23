@@ -54,31 +54,46 @@ def _to_sp_value(list_name: str, col: str, value):
 # ---------------------------------------------------------------------------
 # SharePoint (Microsoft Graph)
 # ---------------------------------------------------------------------------
-class SharePointStore:
-    def __init__(self, cfg: dict):
-        import msal
+class TokenExpired(StorageError):
+    """Token đăng nhập của người dùng đã hết hạn (chế độ delegated)."""
 
+
+class SharePointStore:
+    def __init__(self, cfg: dict, token_provider=None):
+        """``token_provider``: hàm trả về access token Graph. Bỏ trống -> dùng
+        client credentials (``client_id``/``client_secret``) của ứng dụng."""
         self.cfg = cfg
-        try:
-            self._app = msal.ConfidentialClientApplication(
-                cfg["client_id"],
-                authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
-                client_credential=cfg["client_secret"],
-            )
-        except ValueError as exc:
-            raise StorageError(f"Cấu hình tenant_id không hợp lệ: {exc}") from exc
+        self._token_provider = token_provider or self._app_token_provider(cfg)
         self._site_id: str | None = None
         # Tên list thật trên SharePoint, ví dụ {"ThietBi": "DS_ThietBi"}
         self.list_names: dict = cfg.get("lists", {})
         # Ánh xạ cột: {"ThietBi": {"TenThietBi": "TenTB"}}
         self.column_map: dict = cfg.get("columns", {})
 
+    @staticmethod
+    def _app_token_provider(cfg: dict):
+        import msal
+
+        try:
+            app = msal.ConfidentialClientApplication(
+                cfg["client_id"],
+                authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
+                client_credential=cfg["client_secret"],
+            )
+        except ValueError as exc:
+            raise StorageError(f"Cấu hình tenant_id không hợp lệ: {exc}") from exc
+
+        def provider() -> str:
+            result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+            if "access_token" not in result:
+                raise StorageError(f"Không lấy được token Microsoft Graph: {result.get('error_description')}")
+            return result["access_token"]
+
+        return provider
+
     # -- HTTP --
     def _token(self) -> str:
-        result = self._app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-        if "access_token" not in result:
-            raise StorageError(f"Không lấy được token Microsoft Graph: {result.get('error_description')}")
-        return result["access_token"]
+        return self._token_provider()
 
     def _request(self, method: str, url: str, **kwargs) -> dict:
         if not url.startswith("http"):
@@ -94,6 +109,8 @@ class SharePointStore:
             if resp.status_code in (429, 503) and attempt < 3:
                 time.sleep(int(resp.headers.get("Retry-After", 2 ** attempt)))
                 continue
+            if resp.status_code == 401:
+                raise TokenExpired("Phiên đăng nhập Microsoft đã hết hạn, vui lòng đăng nhập lại.")
             if resp.status_code >= 400:
                 raise StorageError(f"Graph API lỗi {resp.status_code}: {resp.text[:500]}")
             return resp.json() if resp.content else {}
@@ -196,20 +213,42 @@ class LocalStore:
 LOCAL_DB = Path(__file__).resolve().parent.parent / "data" / "local_db.json"
 
 
+def _user_token() -> str:
+    """Access token Graph của người đang đăng nhập (chế độ delegated)."""
+    token = st.user.tokens.get("access") if st.user.is_logged_in else None
+    if not token:
+        raise TokenExpired("Chưa có token Microsoft Graph, vui lòng đăng nhập lại.")
+    return token
+
+
 @st.cache_resource
 def get_store():
     cfg = sharepoint_config()
-    if cfg:
-        return SharePointStore(cfg)
-    return LocalStore(LOCAL_DB)
+    if not cfg:
+        return LocalStore(LOCAL_DB)
+    if cfg["mode"] == "delegated":
+        return SharePointStore(cfg, token_provider=_user_token)
+    return SharePointStore(cfg)
 
 
 def is_demo() -> bool:
     return isinstance(get_store(), LocalStore)
 
 
+def _cache_scope() -> str:
+    """Chế độ delegated: mỗi người dùng một bộ nhớ đệm riêng (theo quyền của họ)."""
+    cfg = sharepoint_config()
+    if cfg and cfg["mode"] == "delegated" and st.user.is_logged_in:
+        return str(st.user.get("email") or st.user.get("preferred_username") or "")
+    return ""
+
+
+def empty_frame(list_name: str) -> pd.DataFrame:
+    return pd.DataFrame({c: pd.Series(dtype=str) for c in ["id", *schema.columns_of(list_name)]})
+
+
 @st.cache_data(ttl=120, show_spinner="Đang tải dữ liệu...")
-def _load(list_name: str) -> pd.DataFrame:
+def _load(list_name: str, scope: str) -> pd.DataFrame:  # noqa: ARG001 - scope là khóa cache
     rows = get_store().list_items(list_name)
     cols = ["id", *schema.columns_of(list_name)]
     df = pd.DataFrame(rows)
@@ -231,7 +270,7 @@ def _load(list_name: str) -> pd.DataFrame:
 
 def load(list_name: str) -> pd.DataFrame:
     """DataFrame các mục của list (cột ``id`` là ID item SharePoint)."""
-    return _load(list_name).copy()
+    return _load(list_name, _cache_scope()).copy()
 
 
 def refresh() -> None:
