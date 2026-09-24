@@ -641,7 +641,13 @@ def _config_fingerprint() -> str:
 
 
 def get_store():
-    return _get_store(_config_fingerprint())
+    store = _get_store(_config_fingerprint())
+    cfg = sharepoint_config()
+    expected = {"bridge": BridgeStore}.get(cfg["mode"], SharePointStore) if cfg else LocalStore
+    if type(store) is not expected:  # kết nối cũ còn trong bộ nhớ (vd. từ chế độ demo) -> tạo lại
+        _get_store.clear()
+        store = _get_store(_config_fingerprint())
+    return store
 
 
 @st.cache_resource(max_entries=4)

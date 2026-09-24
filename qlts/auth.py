@@ -185,12 +185,13 @@ def _login_screen_otp() -> None:
         else:
             code = f"{secrets.randbelow(10**6):06d}"
             try:
-                storage.get_store().send_mail(
+                # Tạo kết nối mới từ Secrets (không dùng kết nối đã lưu đệm – có thể là của chế độ demo cũ)
+                storage.BridgeStore(bridge_config()).send_mail(
                     email, f"Mã đăng nhập Ứng dụng quản lý thiết bị: {code}",
                     f"<p>Mã đăng nhập của bạn là <b style='font-size:20px'>{code}</b>.</p>"
                     f"<p>Mã có hiệu lực {OTP_TTL // 60} phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>",
                 )
-            except storage.StorageError as exc:
+            except Exception as exc:  # hiện lỗi dễ hiểu thay vì màn hình lỗi của Streamlit
                 st.error(f"Không gửi được email: {exc}")
             else:
                 st.session_state["otp"] = pending = {
