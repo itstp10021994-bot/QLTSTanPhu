@@ -36,7 +36,7 @@ def _build_user(email: str, fallback_name: str = "") -> CurrentUser:
     except storage.TokenExpired:
         raise
     except storage.StorageError as exc:
-        # Thường gặp lần đầu khi chưa tạo list: vẫn cho quản trị vào trang "Khởi tạo SharePoint"
+        # Thường gặp lần đầu khi chưa tạo list: vẫn cho quản trị vào trang "Kết nối SharePoint"
         st.session_state["startup_error"] = str(exc)
         pq = storage.empty_frame(schema.PHAN_QUYEN)
         phong = storage.empty_frame(schema.PHONG)

@@ -2,7 +2,7 @@
 
 - ``ThietBi`` trỏ tới list có sẵn ``Data_Thietbichitiet``: mỗi dòng là MỘT thiết bị,
   định danh bằng "Mã chi tiết" (``<Mã tài sản>-00001``).
-- Các list còn lại do ứng dụng tạo (trang "Khởi tạo SharePoint"), dùng cột ``Title`` làm mã.
+- Các list còn lại do ứng dụng tạo (trang "Kết nối SharePoint"), dùng cột ``Title`` làm mã.
 """
 
 # ---- Vai trò (phân quyền) ----

@@ -1,16 +1,37 @@
+import pandas as pd
 import streamlit as st
 
-from qlts import auth, schema, sp_setup, storage
+from qlts import auth, diagnostics, schema, sp_setup, storage
 
 auth.require(schema.ROLE_ADMIN)
-st.subheader("Khởi tạo SharePoint")
+st.subheader("Kết nối SharePoint")
+
+st.markdown("##### Kiểm tra kết nối")
+st.caption("Nếu dữ liệu nhập trong app không thấy trên SharePoint, sửa lần lượt các dòng ❌ bên dưới.")
+
+
+def show(rows):
+    if rows:
+        st.dataframe(pd.DataFrame(rows, columns=["", "Bước", "Chi tiết"]), hide_index=True, width="stretch",
+                     column_config={"": st.column_config.TextColumn(width=40)})
+
+
+show(diagnostics.config_checks())
+show(diagnostics.login_checks())
+if st.button("Kiểm tra truy cập site và các list", icon=":material/lan:"):
+    with st.spinner("Đang kết nối SharePoint..."):
+        show(diagnostics.sharepoint_checks())
+if not storage.is_demo() and st.button("Ghi thử 1 dòng (rồi xóa)", icon=":material/edit_note:",
+                                       help="Kiểm tra tài khoản có quyền ghi vào list Phong."):
+    status, message = diagnostics.write_test()
+    (st.success if status == diagnostics.OK else st.error)(message)
 
 store = storage.get_store()
 if storage.is_demo():
-    st.info("Ứng dụng đang chạy chế độ demo, chưa kết nối SharePoint.")
     st.stop()
 
 cfg = store.cfg
+st.divider()
 st.markdown(
     f"Site: `https://{cfg['hostname']}/{cfg['site_path'].strip('/')}`  \n"
     f"Chế độ truy cập: **{'Quyền của người đăng nhập' if cfg['mode'] == 'delegated' else 'Quyền ứng dụng'}**"

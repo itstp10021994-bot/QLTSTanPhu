@@ -11,7 +11,7 @@ Phiên bản Python (Streamlit) của app Power Apps **STP_Thietbi**. Dữ liệ
 | Ban kiểm kê | Kiểm kê theo đợt / nơi sử dụng: gộp thiết bị cùng Mã tài sản + Đặc điểm + Nơi sử dụng, nhập Số lượng kiểm kê → **Xác nhận kiểm kê**; xem kết quả, xuất Excel | Quản trị, Ban kiểm kê |
 | Người dùng | Danh sách Phòng đang quản lý · Kiểm kê: quản lý phòng **xác nhận** (đồng ý / không đồng ý) kết quả của Ban kiểm kê | Mọi người đăng nhập |
 | Báo cáo | Báo cáo tổng quan BGH: số liệu, biểu đồ, tiến độ kiểm kê, thiết bị hỏng, xuất Excel | Quản trị, BGH, Ban quản lý tài sản |
-| Phân quyền | Phân quyền admin (vai trò) · Phân quyền quản lý phòng (danh mục phòng + người phụ trách) · **Xuất / nhập biểu mẫu** (tải biểu mẫu Excel, xuất dữ liệu, nhập hàng loạt vào mọi list) · Khởi tạo SharePoint | Quản trị |
+| Phân quyền | Phân quyền admin (vai trò) · Phân quyền quản lý phòng (danh mục phòng + người phụ trách) · **Xuất / nhập biểu mẫu** (tải biểu mẫu Excel, xuất dữ liệu, nhập hàng loạt vào mọi list) · Kết nối SharePoint | Quản trị |
 
 ## Cấu trúc SharePoint List
 
@@ -24,7 +24,7 @@ Ngày hóa đơn, Nhóm thiết bị, Mail.
   (vd đang có `111028-00018` → tạo `111028-00019`). Nhập nhiều thiết bị cùng lúc sẽ tạo các mã liên tiếp.
 - **Nơi sử dụng** là phòng; **Quản lý phòng** (email) quyết định ai thấy phòng ở mục *Người dùng*.
 - Thiết bị có Nơi sử dụng = `Thanh lý` hoặc Tình trạng = `Đã thanh lý` không tính vào tài sản đang dùng.
-- Trang **Phân quyền → Khởi tạo SharePoint → Kiểm tra** cho biết từng cột đã khớp chưa.
+- Trang **Phân quyền → Kết nối SharePoint → Kiểm tra** cho biết từng cột đã khớp chưa.
   Cột kiểu *Person/Lookup* chỉ đọc (app không ghi vào).
 
 **Tạo list bằng file Excel mẫu** (thư mục `templates/`, tạo lại bằng `python scripts/make_excel_templates.py`):
@@ -44,7 +44,7 @@ hoặc cùng site). **Không đổi tên cột** – app dò cột theo đúng t
 
 Hoặc để app tự tạo các list còn thiếu:
 
-**Các list phụ** (nếu site chưa có, trang *Khởi tạo SharePoint* tạo được) – cột đầu tiên là mã:
+**Các list phụ** (nếu site chưa có, trang *Kết nối SharePoint* tạo được) – cột đầu tiên là mã:
 
 | List | Title | Các cột |
 |---|---|---|
@@ -88,7 +88,7 @@ Nếu list `Data_Thietbichitiet` nằm trong khu vực cá nhân của bạn (đ
 - Ai dùng app (giáo viên quản lý phòng, ban kiểm kê…) phải được bạn **chia sẻ quyền Chỉnh sửa** trên list –
   giống như khi họ dùng app Power Apps hiện tại.
 - Các list phụ (Phong, KiemKe, DieuChuyen, PhanQuyen) sẽ được tạo cùng chỗ với list thiết bị khi bấm
-  *Khởi tạo SharePoint*; nhớ chia sẻ cả các list này.
+  *Kết nối SharePoint*; nhớ chia sẻ cả các list này.
 - Các flow Power Automate bạn đang có (vd *When an item is created* → gửi mail) **vẫn chạy**, vì app ghi vào đúng list đó.
 - App Python không gọi flow Power Automate được với bản miễn phí: trigger *When a HTTP request is received* là
   tính năng **Premium**.
@@ -117,7 +117,7 @@ Nếu list `Data_Thietbichitiet` nằm trong khu vực cá nhân của bạn (đ
      không dùng link "Chia sẻ"). Ví dụ list cá nhân:
      `https://igcschool-my.sharepoint.com/personal/ten_igcschool_edu_vn/Lists/Data_Thietbichitiet/AllItems.aspx`.
    - `[app] admin_emails`: email của bạn.
-6. Mở app, đăng nhập, vào **Phân quyền → Khởi tạo SharePoint**: bấm *Kiểm tra* để xem cột của
+6. Mở app, đăng nhập, vào **Phân quyền → Kết nối SharePoint**: bấm *Kiểm tra* để xem cột của
    `Data_Thietbichitiet` đã khớp chưa, rồi *Tạo list còn thiếu* (cần quyền Owner; list/dữ liệu có sẵn được giữ nguyên).
    Sau đó vào **Phân quyền quản lý phòng** → *Thêm tất cả vào danh mục* để tạo danh mục phòng từ các Nơi sử dụng.
 

@@ -127,6 +127,7 @@ class SharePointStore:
         self.column_map: dict = cfg.get("columns", {})
         self._columns: dict[str, dict] = {}
         self._list_ids: dict[str, str] = {}
+        self.list_web_urls: dict[str, str] = {}
 
     @staticmethod
     def _app_token_provider(cfg: dict):
@@ -197,6 +198,7 @@ class SharePointStore:
                 url_name = requests.utils.unquote(lst.get("webUrl", "").rstrip("/").split("/")[-1])
                 if wanted in (_normalize(lst.get("displayName", "")), _normalize(url_name)):
                     self._list_ids[real] = lst["id"]
+                    self.list_web_urls[real] = lst.get("webUrl", "")
                     break
             else:
                 raise StorageError(f"Không tìm thấy list “{real}” trên site {self.cfg['site_path']}.")

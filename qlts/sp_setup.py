@@ -1,6 +1,6 @@
 """Kiểm tra / tạo các SharePoint List mà ứng dụng cần.
 
-Dùng chung cho ``scripts/setup_sharepoint.py`` và trang "Khởi tạo SharePoint".
+Dùng chung cho ``scripts/setup_sharepoint.py`` và trang "Kết nối SharePoint".
 Người thực hiện cần quyền Owner (hoặc quyền tạo list) trên site.
 """
 

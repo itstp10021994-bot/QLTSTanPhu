@@ -40,11 +40,12 @@ def header(user_name: str) -> None:
         unsafe_allow_html=True,
     )
     if storage.is_demo():
-        problem = sharepoint_config_problem()
-        if problem:
-            st.warning("Đang chạy chế độ demo vì cấu hình SharePoint chưa hợp lệ. " + problem)
-        else:
-            st.caption(":orange[● Chế độ demo] — dữ liệu lưu cục bộ, chưa kết nối SharePoint.")
+        problem = sharepoint_config_problem() or "Chưa cấu hình kết nối SharePoint trong Secrets."
+        st.warning(
+            "**CHẾ ĐỘ DEMO – dữ liệu KHÔNG được ghi lên SharePoint** (chỉ lưu tạm trong app, mất khi app khởi động lại). "
+            f"{problem} Admin xem chi tiết ở **Phân quyền → Kết nối SharePoint**.",
+            icon=":material/warning:",
+        )
 
 
 def footer() -> None:

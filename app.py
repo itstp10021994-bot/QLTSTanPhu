@@ -57,11 +57,10 @@ if user.is_admin:
         page("phan_quyen_admin.py", "Phân quyền admin", ":material/admin_panel_settings:"),
         page("phan_quyen_phong.py", "Phân quyền quản lý phòng", ":material/manage_accounts:"),
         page("xuat_nhap.py", "Xuất / nhập biểu mẫu", ":material/import_export:"),
+        page("khoi_tao_sharepoint.py", "Kết nối SharePoint", ":material/lan:"),
     ]
-    if not storage.is_demo():
-        sections["Phân quyền"].append(page("khoi_tao_sharepoint.py", "Khởi tạo SharePoint", ":material/build:"))
 
-nav = st.navigation(sections)
+nav = st.navigation(sections, expanded=True)  # luôn hiện đủ menu (mặc định chỉ hiện 10 mục)
 
 with st.sidebar:
     st.divider()
@@ -77,7 +76,7 @@ ui.header(user.name)
 if st.session_state.get("startup_error"):
     st.warning(
         "Chưa đọc được dữ liệu phân quyền từ SharePoint. Nếu đây là lần đầu, quản trị viên hãy vào "
-        "**Phân quyền → Khởi tạo SharePoint** để tạo list.  \n" + st.session_state["startup_error"][:300]
+        "**Phân quyền → Kết nối SharePoint** để kiểm tra và tạo list.  \n" + st.session_state["startup_error"][:300]
     )
 ui.show_flash()
 try:

@@ -4,7 +4,7 @@
     python scripts/setup_sharepoint.py [--seed-admin email@truong.edu.vn]
 
 Nếu bạn dùng chế độ đăng nhập bằng tài khoản cá nhân (không có client_secret),
-hãy dùng trang "Khởi tạo SharePoint" ngay trong ứng dụng thay cho script này.
+hãy dùng trang "Kết nối SharePoint" ngay trong ứng dụng thay cho script này.
 """
 
 import argparse
@@ -28,7 +28,7 @@ def main() -> None:
 
     cfg = tomllib.loads(Path(args.secrets).read_text(encoding="utf-8"))["sharepoint"]
     if not cfg.get("client_secret"):
-        sys.exit("Không có client_secret: hãy dùng trang 'Khởi tạo SharePoint' trong ứng dụng.")
+        sys.exit("Không có client_secret: hãy dùng trang 'Kết nối SharePoint' trong ứng dụng.")
     store = SharePointStore(cfg)
     for line in ensure_lists(store, add_columns_to=set(schema.LISTS) - {schema.THIET_BI}):
         print("-", line)

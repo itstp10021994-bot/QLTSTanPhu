@@ -19,11 +19,24 @@ def real_name(key: str) -> str:
     return store.real_list_name(key) if hasattr(store, "real_list_name") else schema.LISTS[key]["sp_list"]
 
 
+if storage.is_demo():
+    st.error("App đang ở **chế độ DEMO**: dữ liệu nhập ở đây chỉ lưu tạm trong app, **không lên SharePoint**. "
+             "Vào **Phân quyền → Kết nối SharePoint** để xem bước cấu hình còn thiếu.", icon=":material/cloud_off:")
+
 list_key = st.selectbox(
     "List", list(excel_io.LIST_TITLES),
     format_func=lambda k: f"{excel_io.LIST_TITLES[k]} ({real_name(k)})",
 )
 labels = schema.labels_of(list_key)
+if not storage.is_demo():
+    try:
+        store.list_id(list_key)
+        st.caption(f"Ghi vào SharePoint: {store.list_web_urls.get(real_name(list_key)) or real_name(list_key)}")
+    except storage.TokenExpired:
+        raise
+    except storage.StorageError as exc:
+        st.error(str(exc))
+        st.stop()
 today = date.today().strftime("%Y%m%d")
 
 # ---------------------------------------------------------------------------
@@ -94,7 +107,8 @@ if plan["problems"]:
             st.write("•", p)
 st.caption("Ô trống trong file không ghi đè dữ liệu đang có.")
 
-if st.button(f"Nhập {len(plan['ops'])} dòng lên SharePoint", type="primary", icon=":material/upload:",
+target = "dữ liệu DEMO (không lên SharePoint)" if storage.is_demo() else "SharePoint"
+if st.button(f"Nhập {len(plan['ops'])} dòng vào {target}", type="primary", icon=":material/upload:",
              disabled=not plan["ops"]):
     bar = st.progress(0.0, text="Đang ghi lên SharePoint...")
     errors = storage.batch(list_key, plan["ops"],
@@ -104,5 +118,8 @@ if st.button(f"Nhập {len(plan['ops'])} dòng lên SharePoint", type="primary",
         st.error(f"Hoàn tất với {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:30]))
     else:
         st.session_state["xn_version"] = st.session_state.get("xn_version", 0) + 1
-        ui.flash(f"Đã nhập vào {real_name(list_key)}: {plan['create']} thêm mới, {plan['update']} cập nhật.")
+        after = len(storage.load_fresh(list_key))  # đọc lại trực tiếp để xác nhận
+        where = "dữ liệu DEMO" if storage.is_demo() else f"SharePoint list {real_name(list_key)}"
+        ui.flash(f"Đã nhập vào {where}: {plan['create']} thêm mới, {plan['update']} cập nhật. "
+                 f"List hiện có {after} dòng (trước khi nhập: {len(data)}).")
         st.rerun()
