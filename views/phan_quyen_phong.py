@@ -17,8 +17,7 @@ managers = thietbi.room_managers()
 def sync_items(room: str, email: str) -> int:
     """Cập nhật cột Quản lý phòng của các thiết bị trong phòng."""
     items = tb[(tb["NoiSuDung"] == room) & (tb["QuanLyPhong"].str.strip().str.lower() != email)]
-    for item_id in items["id"]:
-        storage.update(schema.THIET_BI, item_id, {"QuanLyPhong": email})
+    storage.batch(schema.THIET_BI, [("update", item_id, {"QuanLyPhong": email}) for item_id in items["id"]])
     return len(items)
 
 
@@ -30,8 +29,8 @@ if missing:
                     + (" ..." if len(missing) > 30 else ""))
         if st.button("Thêm tất cả vào danh mục (lấy người quản lý từ thiết bị)", icon=":material/playlist_add:"):
             with st.spinner("Đang tạo..."):
-                for room in missing:
-                    storage.create(schema.PHONG, {"Title": room, "TenPhong": room, "NguoiQuanLy": managers.get(room, "")})
+                storage.batch(schema.PHONG, [("create", {"Title": room, "TenPhong": room,
+                                                         "NguoiQuanLy": managers.get(room, "")}) for room in missing])
             ui.flash(f"Đã thêm {len(missing)} phòng vào danh mục.")
             st.rerun()
 

@@ -115,8 +115,7 @@ if submitted:
         codes = thietbi.next_detail_codes(fresh, ma, so_luong)
         stt = int(fresh["STT"].max()) if not fresh.empty else 0
         quan_ly_phong = managers.get(noi, "")
-        for i, code in enumerate(codes):
-            storage.create(schema.THIET_BI, {
+        ops = [("create", {
                 "MaChiTiet": code, "MaTaiSan": ma, "STT": stt + i + 1,
                 "TenThietBi": ten.strip(), "ChiTiet": chi_tiet.strip() or ten.strip(), "DacDiem": dac_diem,
                 "TenPhongBan": serial_lines[i] if i < len(serial_lines) else "",
@@ -125,7 +124,11 @@ if submitted:
                 "NgayMua": ngay_mua, "NgayHoaDon": ngay_hd, "GiaTri": gia_tri, "MaSAP": ma_sap,
                 "ThoiHanBaoHanh": bao_hanh, "NhomThietBi": nhom, "GhiChu": ghi_chu,
                 "PhanQuyenTB": tv("PhanQuyenTB"),
-            })
+            }) for i, code in enumerate(codes)]
+        errors = storage.batch(schema.THIET_BI, ops)
+    if errors:
+        st.error("Có lỗi khi lưu:\n\n" + "\n\n".join(errors[:20]))
+        st.stop()
     shown = codes[0] if len(codes) == 1 else f"{codes[0]} → {codes[-1]}"
     ui.flash(f"Đã nhập {len(codes)} thiết bị {ten} ({shown}) vào {labels.get(noi, noi)}.")
     st.rerun()

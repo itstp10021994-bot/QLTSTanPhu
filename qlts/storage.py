@@ -449,6 +449,8 @@ class BridgeStore(SharePointStore):
 
     def __init__(self, cfg: dict):
         super().__init__(cfg, token_provider=lambda: "")
+        self._index: tuple[float, list] | None = None
+        self._index_lock = threading.Lock()
         self.flow_url = cfg["flow_url"]
         self.key = cfg["key"]
 
@@ -501,9 +503,7 @@ class BridgeStore(SharePointStore):
             candidates = [self.list_names[list_name]]
         else:
             candidates = [schema.LISTS[list_name]["sp_list"], *schema.LISTS[list_name].get("aliases", [])]
-        data = self.rest("GET", "_api/web/lists?$select=Id,Title,Hidden,RootFolder/ServerRelativeUrl"
-                                "&$expand=RootFolder&$filter=Hidden eq false")
-        lists = data.get("value", [])
+        lists = self._lists_index()
         for cand in candidates:
             wanted = _normalize(cand)
             for lst in lists:
@@ -515,6 +515,21 @@ class BridgeStore(SharePointStore):
                     self.list_web_urls[self._resolved_names[list_name]] = url
                     return lst["Id"]
         raise StorageError(f"Không tìm thấy list “{' / '.join(candidates)}” trên site của flow.")
+
+    def _lists_index(self) -> list[dict]:
+        """Danh sách các list của site – gọi flow MỘT lần rồi dùng lại cho mọi list."""
+        with self._index_lock:
+            if self._index and time.time() - self._index[0] < COLUMNS_TTL:
+                return self._index[1]
+            data = self.rest("GET", "_api/web/lists?$select=Id,Title,Hidden,RootFolder/ServerRelativeUrl"
+                                    "&$expand=RootFolder&$filter=Hidden eq false")
+            self._index = (time.time(), data.get("value", []))
+            return self._index[1]
+
+    def forget_schema(self, list_name: str | None = None) -> None:
+        super().forget_schema(list_name)
+        if list_name is None:
+            self._index = None
 
     def _list_uri(self, list_name: str) -> str:
         return f"_api/web/lists(guid'{self.list_id(list_name)}')"
@@ -745,24 +760,87 @@ def _to_frame(list_name: str, rows: list[dict]) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=120, show_spinner="Đang tải dữ liệu...")
-def _load(list_name: str, scope: str) -> pd.DataFrame:  # noqa: ARG001 - scope là khóa cache
-    return _to_frame(list_name, get_store().list_items(list_name))
+# ---------------------------------------------------------------------------
+# Bộ nhớ đệm dữ liệu (dùng chung cho mọi người dùng của app)
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def _data_cache() -> dict:
+    return {"lock": threading.Lock(), "data": {}}
+
+
+def _cache_ttl() -> float:
+    """Thời gian giữ dữ liệu (giây). App tự làm mới list khi chính nó ghi; sửa trực tiếp trên
+    SharePoint thì bấm "Làm mới". Đổi được bằng [app] cache_minutes trong Secrets."""
+    try:
+        return float(app_setting("cache_minutes", 10)) * 60
+    except (TypeError, ValueError):
+        return 600.0
+
+
+def _cached(key) -> pd.DataFrame | None:
+    hit = _data_cache()["data"].get(key)
+    if hit and time.time() - hit[0] < _cache_ttl():
+        return hit[1]
+    return None
+
+
+def _put(key, df: pd.DataFrame) -> None:
+    with _data_cache()["lock"]:
+        _data_cache()["data"][key] = (time.time(), df)
 
 
 def load(list_name: str) -> pd.DataFrame:
     """DataFrame các mục của list (cột ``id`` là ID item SharePoint)."""
-    return _load(list_name, _cache_scope()).copy()
+    key = (_cache_scope(), list_name)
+    df = _cached(key)
+    if df is None:
+        with st.spinner("Đang tải dữ liệu..."):
+            df = _to_frame(list_name, get_store().list_items(list_name))
+        _put(key, df)
+    return df.copy()
+
+
+def prefetch(list_names: list[str] | None = None) -> None:
+    """Tải trước nhiều list CÙNG LÚC (song song) – nhanh hơn nhiều so với tải lần lượt
+    khi mỗi lần đọc phải chạy flow Power Automate. Lỗi được bỏ qua ở đây (sẽ hiện khi trang đọc list)."""
+    cfg = sharepoint_config()
+    if not cfg or cfg["mode"] == "delegated":  # delegated cần ngữ cảnh người dùng -> không chạy song song
+        return
+    scope = _cache_scope()
+    stale = [n for n in (list_names or list(schema.LISTS)) if _cached((scope, n)) is None]
+    if len(stale) < 2:
+        return
+    from concurrent.futures import ThreadPoolExecutor
+
+    store = get_store()
+    if hasattr(store, "resolve_all"):
+        try:
+            store.resolve_all()  # tìm ID các list bằng MỘT lần gọi trước khi chạy song song
+        except StorageError:
+            return
+    with st.spinner("Đang tải dữ liệu..."), ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {name: pool.submit(store.list_items, name) for name in stale}
+        for name, fut in futures.items():
+            if fut.exception() is None:
+                _put((scope, name), _to_frame(name, fut.result()))
 
 
 def load_fresh(list_name: str) -> pd.DataFrame:
     """Đọc thẳng từ SharePoint, bỏ qua bộ nhớ đệm (dùng khi sinh mã mới)."""
-    return _to_frame(list_name, get_store().list_items(list_name))
+    df = _to_frame(list_name, get_store().list_items(list_name))
+    _put((_cache_scope(), list_name), df)
+    return df.copy()
 
 
-def refresh(schema_too: bool = False) -> None:
-    """Xóa bộ nhớ đệm dữ liệu; ``schema_too`` = dò lại cả cột/list (nút Làm mới)."""
-    _load.clear()
+def refresh(list_name: str | None = None, schema_too: bool = False) -> None:
+    """Xóa bộ nhớ đệm: của một list (sau khi ghi) hoặc tất cả; ``schema_too`` = dò lại cột/list."""
+    cache = _data_cache()
+    with cache["lock"]:
+        if list_name is None:
+            cache["data"].clear()
+        else:
+            for key in [k for k in cache["data"] if k[1] == list_name]:
+                cache["data"].pop(key, None)
     if schema_too:
         store = get_store()
         if hasattr(store, "forget_schema"):
@@ -773,21 +851,21 @@ def create(list_name: str, fields: dict) -> str:
     try:
         return get_store().create(list_name, fields)
     finally:
-        refresh()
+        refresh(list_name)
 
 
 def update(list_name: str, item_id: str, fields: dict) -> None:
     try:
         get_store().update(list_name, item_id, fields)
     finally:
-        refresh()
+        refresh(list_name)
 
 
 def delete(list_name: str, item_id: str) -> None:
     try:
         get_store().delete(list_name, item_id)
     finally:
-        refresh()
+        refresh(list_name)
 
 
 def batch(list_name: str, ops: list[tuple], progress=None) -> list[str]:
@@ -797,4 +875,4 @@ def batch(list_name: str, ops: list[tuple], progress=None) -> list[str]:
     try:
         return get_store().batch(list_name, ops, progress)
     finally:
-        refresh()
+        refresh(list_name)

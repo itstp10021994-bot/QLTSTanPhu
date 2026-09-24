@@ -35,6 +35,7 @@ class CurrentUser:
 def _build_user(email: str, fallback_name: str = "") -> CurrentUser:
     email = email.strip().lower()
     try:
+        storage.prefetch()  # tải song song mọi list một lần (nhanh hơn nhiều khi đi qua Power Automate)
         pq = storage.load(schema.PHAN_QUYEN)
         phong = storage.load(schema.PHONG)
     except storage.TokenExpired:
@@ -154,6 +155,7 @@ def known_emails() -> set[str]:
     """Email được phép đăng nhập: có trong Phân quyền, danh mục phòng, cột Quản lý phòng, hoặc admin_emails."""
     emails = set(admin_emails())
     try:
+        storage.prefetch([schema.PHAN_QUYEN, schema.PHONG, schema.THIET_BI])
         emails |= set(storage.load(schema.PHAN_QUYEN)["Title"].str.strip().str.lower())
         emails |= set(storage.load(schema.PHONG)["NguoiQuanLy"].str.strip().str.lower())
         emails |= set(storage.load(schema.THIET_BI)["QuanLyPhong"].str.strip().str.lower())

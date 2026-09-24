@@ -42,17 +42,20 @@ else:
             st.stop()
         ql_moi = managers.get(den_phong, "")
         with st.spinner("Đang cập nhật SharePoint..."):
-            for item in chosen.itertuples():
-                storage.update(schema.THIET_BI, item.id, {
-                    "NoiSuDung": den_phong,
-                    "QuanLyPhong": ql_moi or item.QuanLyPhong,
-                    "NguoiSuDung": nguoi_sd.strip().lower() or ql_moi or item.NguoiSuDung,
-                })
-                storage.create(schema.DIEU_CHUYEN, {
-                    "Title": item.MaChiTiet, "TenThietBi": item.TenThietBi, "TuPhong": tu_phong,
-                    "DenPhong": den_phong, "SoLuong": 1, "NgayDieuChuyen": ngay,
-                    "NguoiThucHien": user.email, "LyDo": ly_do,
-                })
+            items = list(chosen.itertuples())
+            errors = storage.batch(schema.THIET_BI, [("update", item.id, {
+                "NoiSuDung": den_phong,
+                "QuanLyPhong": ql_moi or item.QuanLyPhong,
+                "NguoiSuDung": nguoi_sd.strip().lower() or ql_moi or item.NguoiSuDung,
+            }) for item in items])
+            errors += storage.batch(schema.DIEU_CHUYEN, [("create", {
+                "Title": item.MaChiTiet, "TenThietBi": item.TenThietBi, "TuPhong": tu_phong,
+                "DenPhong": den_phong, "SoLuong": 1, "NgayDieuChuyen": ngay,
+                "NguoiThucHien": user.email, "LyDo": ly_do,
+            }) for item in items])
+        if errors:
+            st.error("Có lỗi khi lưu:\n\n" + "\n\n".join(errors[:20]))
+            st.stop()
         ui.flash(f"Đã điều chuyển {len(chosen)} thiết bị từ {fmt(tu_phong)} sang {fmt(den_phong)}.")
         st.rerun()
 
