@@ -138,8 +138,8 @@ key = "<mã bí mật ở bước 1>"
 
 ## Lưu ý
 
-- Sau khi đăng nhập, app lưu phiên vào **cookie trình duyệt** 7 ngày (`[app] session_days`): tải lại trang, đóng/mở
-  lại trình duyệt vẫn còn đăng nhập. Bấm **Đăng xuất**, xóa cookie, hoặc dùng cửa sổ ẩn danh thì phải nhập lại mã.
+- Sau khi đăng nhập, app lưu phiên trong **trình duyệt** (localStorage + cookie) 7 ngày (`[app] session_days`): tải lại trang, đóng/mở
+  lại trình duyệt vẫn còn đăng nhập. Bấm **Đăng xuất**, xóa dữ liệu duyệt web, hoặc dùng cửa sổ ẩn danh thì phải nhập lại mã.
 - Mọi thay đổi trên SharePoint hiển thị người sửa là **chủ flow** (bạn). App vẫn ghi người thao tác vào các cột
   như *Người thực hiện*, *Người kiểm kê*, *Người xác nhận*.
 - Người dùng **không cần** quyền trên site SharePoint – chỉ chủ flow cần.

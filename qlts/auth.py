@@ -223,25 +223,74 @@ def _login_screen_otp() -> None:
             st.rerun()
 
 
-def _session_token() -> str:
-    """Token phiên: trong phiên đang mở > trên URL (cách cũ) > cookie trình duyệt."""
+_STORE_JS = """
+export default function({ data, setStateValue }) {
+  const K = "qlts_session";
+  const d = data || {};
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  const put = (v, age) => { document.cookie = K + "=" + v + "; path=/; max-age=" + age + "; SameSite=Lax" + secure; };
+  if (d.clear) {
+    try { localStorage.removeItem(K); } catch (e) {}
+    put("", 0);
+    return;
+  }
+  if (d.write) {
+    try { localStorage.setItem(K, d.write); } catch (e) {}
+    put(d.write, d.max_age);
+    return;
+  }
+  let v = "";
+  try { v = localStorage.getItem(K) || ""; } catch (e) {}
+  if (!v) {
+    const m = document.cookie.match(/(?:^|; )qlts_session=([^;]*)/);
+    v = m ? m[1] : "";
+  }
+  setStateValue("token", v);
+}
+"""
+_session_store = st.components.v2.component("qlts_session_store", js=_STORE_JS)
+
+
+def _browser_store(data: dict) -> str | None:
+    """Đọc/ghi token phiên ở trình duyệt (localStorage + cookie) qua một component JS nhỏ.
+
+    Trả ``None`` khi trình duyệt chưa báo về (lần chạy đầu tiên của phiên), ``""`` nếu không có token.
+    """
+    res = _session_store(key="qlts_session_store", data=data, default={"token": None},
+                         on_token_change=lambda: None)
+    return getattr(res, "token", None)
+
+
+def _otp_user() -> CurrentUser | None:
+    logged_out = bool(st.session_state.get("logged_out"))
     token = st.session_state.get("session_token", "")
-    if SESSION_PARAM in st.query_params:
+    if SESSION_PARAM in st.query_params:  # link cũ có ?s=
         token = token or st.query_params[SESSION_PARAM]
         del st.query_params[SESSION_PARAM]  # không để token trên thanh địa chỉ (tránh lộ khi chia sẻ link)
-    if not token and not st.session_state.get("logged_out"):
-        # st.context.cookies chỉ đọc lúc mở kết nối -> sau khi đăng xuất phải bỏ qua cookie cũ
-        token = st.context.cookies.get(SESSION_COOKIE, "")
-    return token
+    if token and read_session_token(token):
+        if st.session_state.get("stored_token") != token:
+            # Lưu ở trình duyệt: tải lại trang / mở lại trình duyệt vẫn còn đăng nhập
+            _browser_store({"write": token, "max_age": int(float(app_setting("session_days", 7)) * 86400)})
+            st.session_state["stored_token"] = token
+        st.session_state["session_token"] = token
+        return _build_user(read_session_token(token))
 
-
-def _write_cookie(value: str, max_age: int) -> None:
-    """Ghi/xóa cookie phiên ngay trên trang ứng dụng (cùng tên miền với kết nối của Streamlit)."""
-    st.html(
-        "<script>document.cookie = " + json.dumps(f"{SESSION_COOKIE}={value}; path=/; max-age={max_age}; SameSite=Lax")
-        + " + (location.protocol === 'https:' ? '; Secure' : '');</script>",
-        unsafe_allow_javascript=True,
-    )
+    st.session_state.pop("session_token", None)
+    if logged_out:
+        # Sau khi đăng xuất bỏ qua token cũ (kể cả st.context.cookies – chỉ đọc lúc mở kết nối)
+        _browser_store({"clear": True})
+        _login_screen_otp()
+        return None
+    stored = _browser_store({})
+    token = stored or st.context.cookies.get(SESSION_COOKIE, "")
+    email = read_session_token(token) if token else None
+    if email:
+        st.session_state["session_token"] = st.session_state["stored_token"] = token
+        return _build_user(email)
+    if stored is None:
+        st.caption("Đang kiểm tra phiên đăng nhập đã lưu...")
+    _login_screen_otp()
+    return None
 
 
 def current_user() -> CurrentUser | None:
@@ -258,20 +307,7 @@ def current_user() -> CurrentUser | None:
         return _build_user(email, st.user.get("name") or "")
 
     if login_mode() == "otp":
-        token = _session_token()
-        email = read_session_token(token) if token else None
-        if not email:
-            st.session_state.pop("session_token", None)
-            if st.session_state.get("logged_out"):
-                _write_cookie("", 0)
-            _login_screen_otp()
-            return None
-        st.session_state["session_token"] = token
-        if st.session_state.get("cookie_written") != token:
-            # Lưu vào cookie trình duyệt: tải lại trang / mở lại trình duyệt vẫn còn đăng nhập
-            _write_cookie(token, int(float(app_setting("session_days", 7)) * 86400))
-            st.session_state["cookie_written"] = token
-        return _build_user(email)
+        return _otp_user()
 
     email = st.session_state.get("demo_email")
     if not email:
@@ -285,7 +321,7 @@ def logout() -> None:
         st.logout()
     elif login_mode() == "otp":
         st.query_params.pop(SESSION_PARAM, None)
-        for k in ("session_token", "cookie_written"):
+        for k in ("session_token", "stored_token"):
             st.session_state.pop(k, None)
         st.session_state["logged_out"] = True  # màn hình đăng nhập sẽ xóa cookie
         st.rerun()
