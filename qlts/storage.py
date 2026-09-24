@@ -246,7 +246,8 @@ class SharePointStore:
         for key, spec in schema.LISTS[list_name]["columns"].items():
             # Ưu tiên tên hiển thị (list tạo từ file Excel mẫu có cột "Mã phòng", "Email"... riêng,
             # cột Title mặc định vẫn còn nhưng bỏ trống), sau đó mới tới tên nội bộ / Title.
-            candidates = [(overrides.get(key), "any"), (spec["label"], "display"), (key, "name"), (spec.get("sp"), "name")]
+            candidates = [(overrides.get(key), "any"), (spec["label"], "display"),
+                          *((alt, "display") for alt in spec.get("alt", [])), (key, "name"), (spec.get("sp"), "name")]
             for cand, how in candidates:
                 if not cand:
                     continue
@@ -564,9 +565,11 @@ class LocalStore:
             data = self._read()
         except (OSError, ValueError):
             return {}
-        # dữ liệu demo kiểu cũ (trước khi đổi sang Data_Thietbichitiet) -> tạo lại
+        # dữ liệu demo kiểu cũ -> tạo lại
         rows = data.get(schema.THIET_BI, [])
-        return data if not rows or "MaChiTiet" in rows[0] else {}
+        if (rows and "MaChiTiet" not in rows[0]) or schema.LOAI_TB not in data:
+            return {}
+        return data
 
     def _read(self) -> dict:
         if not self.path.exists():  # file demo bị xóa -> tạo lại dữ liệu mẫu

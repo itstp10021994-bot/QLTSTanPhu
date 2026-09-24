@@ -48,6 +48,7 @@ SAMPLES = {
         "TrangThaiKiemKe": "Đã kiểm kê", "NgayXacNhan": None, "TrangThaiXacNhan": "",
         "DotKiemKe": "Đợt 2 năm 2024 - 2025", "NguoiKiemKe": "kiemke@truong.edu.vn", "NguoiXacNhan": "",
     },
+    schema.LOAI_TB: {"TenThietBi": "Màn hình LED", "MaPhanLoai": "111305", "NhomThietBi": "Nhóm Công Nghệ Thông Tin"},
     schema.PHAN_QUYEN: {
         "Title": "email_cua_ban@truong.edu.vn", "HoTen": "Lê Thiên An", "VaiTro": schema.ROLE_ADMIN,
         "ChucDanh": "Chuyên viên Quản lý hệ thống",
@@ -65,6 +66,7 @@ NOTES = {
     "TrangThaiXacNhan": "Đã xác nhận / Không đồng ý (quản lý phòng xác nhận)",
     "NguoiKiemKe": "Không bắt buộc – có cột thì app ghi email người kiểm kê",
     "NguoiXacNhan": "Không bắt buộc – có cột thì app ghi email người xác nhận",
+    "MaPhanLoai": "Mã tài sản của loại thiết bị – chọn tên khi nhập mới, app tự điền mã này",
     "Title": "",
 }
 
@@ -74,6 +76,7 @@ LIST_TITLES = {
     schema.DIEU_CHUYEN: "Lịch sử điều chuyển",
     schema.KIEM_KE: "Kiểm kê",
     schema.PHAN_QUYEN: "Phân quyền",
+    schema.LOAI_TB: "Danh mục loại thiết bị",
 }
 
 FILES = {
@@ -82,6 +85,7 @@ FILES = {
     schema.DIEU_CHUYEN: ("3_DieuChuyen.xlsx", "DieuChuyen"),
     schema.KIEM_KE: ("4_KiemKe.xlsx", "Data_Thietbi"),
     schema.PHAN_QUYEN: ("5_PhanQuyen.xlsx", "PhanQuyen"),
+    schema.LOAI_TB: ("6_LoaiThietBi.xlsx", "Data_Loaithietbi"),
 }
 
 
@@ -202,6 +206,7 @@ MATCH_KEYS = {
     schema.PHAN_QUYEN: ["Title", "VaiTro"],
     schema.KIEM_KE: ["DotKiemKe", "NoiSuDung", "MaTaiSan", "DacDiem"],
     schema.DIEU_CHUYEN: [],  # lịch sử: luôn thêm mới
+    schema.LOAI_TB: ["MaPhanLoai"],
 }
 
 
@@ -219,6 +224,7 @@ REQUIRED = {
     schema.KIEM_KE: ["DotKiemKe", "NoiSuDung", "MaTaiSan"],
     schema.DIEU_CHUYEN: ["Title"],
     schema.THIET_BI: [],  # kiểm tra riêng (cần Mã tài sản hoặc Mã chi tiết)
+    schema.LOAI_TB: ["MaPhanLoai", "TenThietBi"],
 }
 
 

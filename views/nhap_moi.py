@@ -12,27 +12,48 @@ labels = ui.room_label_map()
 rooms = list(labels)
 managers = thietbi.room_managers()
 
-# ---- Chọn mã tài sản (ngoài form để gợi ý thông tin & mã chi tiết ngay) ----
-NEW = "+ Mã tài sản mới"
+# ---- Chọn loại thiết bị -> Mã tài sản (ngoài form để gợi ý thông tin & mã chi tiết ngay) ----
+NEW = "+ Mã tài sản mới (không có trong danh mục)"
+catalog = thietbi.load_catalog().set_index("MaPhanLoai")
 latest = tb.sort_values("id", key=lambda s: s.astype(int)).drop_duplicates("MaTaiSan", keep="last")
 latest = latest[latest["MaTaiSan"] != ""].set_index("MaTaiSan")
+# Danh mục trước (theo tên), sau đó các mã đang dùng nhưng chưa có trong danh mục
+codes_opts = [*catalog.index, *sorted(set(latest.index) - set(catalog.index))]
+
+
+def option_label(m: str) -> str:
+    if m == NEW:
+        return m
+    if m in catalog.index:
+        row = catalog.loc[m]
+        return f"{row['TenThietBi']} – {m}" + (f" · {row['NhomThietBi']}" if row["NhomThietBi"] else "")
+    return f"{latest.loc[m, 'TenThietBi'] or latest.loc[m, 'ChiTiet']} – {m} (chưa có trong danh mục)"
+
+
 c1, c2 = st.columns([2, 1])
 ma_sel = c1.selectbox(
-    "Mã tài sản", [NEW, *sorted(latest.index)],
-    format_func=lambda m: m if m == NEW else f"{m} – {latest.loc[m, 'TenThietBi'] or latest.loc[m, 'ChiTiet']}",
+    "Loại thiết bị (gõ tên để tìm)", [*codes_opts, NEW], index=None, format_func=option_label,
+    placeholder="Chọn loại thiết bị – app tự điền Mã tài sản và Nhóm thiết bị",
 )
-ma = c1.text_input("Nhập mã tài sản mới *").strip() if ma_sel == NEW else ma_sel
+if catalog.empty:
+    c1.caption("Chưa đọc được danh mục loại thiết bị (list Data_Loaithietbi) – đang dùng các mã đã có.")
+ma = c1.text_input("Nhập mã tài sản mới *").strip() if ma_sel == NEW else (ma_sel or "")
 so_luong = c2.number_input("Số thiết bị nhập", min_value=1, max_value=200, value=1, step=1,
                            help="Mỗi thiết bị là một dòng với Mã chi tiết riêng.")
+if not ma:
+    st.info("Chọn loại thiết bị để bắt đầu.", icon=":material/touch_app:")
+    st.stop()
 tpl = latest.loc[ma] if ma in latest.index else None
-codes = thietbi.next_detail_codes(tb, ma, so_luong) if ma else []
-if codes:
-    shown = codes[0] if len(codes) == 1 else f"{codes[0]} → {codes[-1]}"
-    st.info(f"Mã chi tiết sẽ tạo: **{shown}**", icon=":material/tag:")
+cat_row = catalog.loc[ma] if ma in catalog.index else None
+codes = thietbi.next_detail_codes(tb, ma, so_luong)
+shown = codes[0] if len(codes) == 1 else f"{codes[0]} → {codes[-1]}"
+st.info(f"Mã tài sản: **{ma}** · Mã chi tiết sẽ tạo: **{shown}**", icon=":material/tag:")
 
 
 def tv(col: str, default=""):
-    """Giá trị gợi ý từ thiết bị cùng mã tài sản gần nhất."""
+    """Giá trị gợi ý: danh mục loại thiết bị (tên, nhóm) > thiết bị cùng mã gần nhất."""
+    if cat_row is not None and col in ("TenThietBi", "NhomThietBi") and cat_row[col]:
+        return cat_row[col]
     return tpl[col] if tpl is not None and tpl[col] else default
 
 
@@ -44,7 +65,10 @@ with st.form(f"nhap_moi_{ma}", clear_on_submit=False):
     c1, c2, c3 = st.columns(3)
     ten = c1.text_input("Tên thiết bị *", tv("TenThietBi"))
     chi_tiet = c2.text_input("Chi tiết", tv("ChiTiet"))
-    nhom_opts = thietbi.distinct(tb, "NhomThietBi", schema.NHOM_THIET_BI)
+    nhom_opts = thietbi.distinct(tb, "NhomThietBi", [*catalog["NhomThietBi"].unique(), *schema.NHOM_THIET_BI])
+    if tv("NhomThietBi") and tv("NhomThietBi") not in nhom_opts:
+        nhom_opts.insert(0, tv("NhomThietBi"))
+    nhom_opts = [o for o in nhom_opts if o]
     nhom = c3.selectbox("Nhóm thiết bị", nhom_opts, index=idx(nhom_opts, tv("NhomThietBi")),
                         accept_new_options=True)
     dac_diem = st.text_input("Đặc điểm", tv("DacDiem"), placeholder="Hãng, cấu hình, model...")

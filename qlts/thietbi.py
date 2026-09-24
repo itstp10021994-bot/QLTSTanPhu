@@ -80,12 +80,12 @@ def prepare_new(fields: dict, existing_codes: list[str], used_codes: dict, stt: 
     ``used_codes`` / ``stt`` được cập nhật tại chỗ để nhiều dòng mới liên tiếp không trùng mã.
     Trả về chuỗi lỗi nếu thiếu dữ liệu.
     """
-    fields = dict(fields)
+    fields = catalog_fill(fields, load_catalog())
     ma = str(fields.get("MaTaiSan") or "").strip()
     code = str(fields.get("MaChiTiet") or "").strip()
     if not code:
         if not ma:
-            return "thiếu Mã tài sản"
+            return "thiếu Mã tài sản (hoặc Tên thiết bị không có trong danh mục loại thiết bị)"
         fresh = used_codes.setdefault(ma, [])
         code = next_detail_codes(pd.DataFrame({"MaChiTiet": [*existing_codes, *fresh]}), ma)[0]
         fresh.append(code)
@@ -99,4 +99,44 @@ def prepare_new(fields: dict, existing_codes: list[str], used_codes: dict, stt: 
     if room and not fields.get("QuanLyPhong"):
         fields["QuanLyPhong"] = managers.get(room, "")
     fields.setdefault("QuanLyThietBi", user_name)
+    return fields
+
+
+# ---------------------------------------------------------------------------
+# Danh mục loại thiết bị (Data_Loaithietbi): tên -> mã tài sản, nhóm
+# ---------------------------------------------------------------------------
+def load_catalog() -> pd.DataFrame:
+    """Danh mục loại thiết bị; rỗng nếu list chưa có trên SharePoint (app vẫn chạy bình thường)."""
+    try:
+        cat = storage.load(schema.LOAI_TB)
+    except storage.TokenExpired:
+        raise
+    except storage.StorageError:
+        return storage.empty_frame(schema.LOAI_TB)
+    cat = cat[(cat["MaPhanLoai"].str.strip() != "")].copy()
+    cat["MaPhanLoai"] = cat["MaPhanLoai"].str.strip()
+    return cat.drop_duplicates("MaPhanLoai").sort_values("TenThietBi", key=lambda s: s.str.lower())
+
+
+def catalog_fill(fields: dict, catalog: pd.DataFrame) -> dict:
+    """Điền Mã tài sản / Tên / Nhóm thiết bị còn trống dựa vào danh mục loại thiết bị."""
+    if catalog is None or catalog.empty:
+        return fields
+    fields = dict(fields)
+    ma = str(fields.get("MaTaiSan") or "").strip()
+    ten = str(fields.get("TenThietBi") or "").strip()
+    row = None
+    if ma:
+        hit = catalog[catalog["MaPhanLoai"] == ma]
+        row = hit.iloc[0] if not hit.empty else None
+    elif ten:
+        hit = catalog[catalog["TenThietBi"].str.strip().str.lower() == ten.lower()]
+        if len(hit) == 1:  # chỉ tự điền khi tên khớp đúng một loại
+            row = hit.iloc[0]
+            fields["MaTaiSan"] = row["MaPhanLoai"]
+    if row is not None:
+        if not ten:
+            fields["TenThietBi"] = row["TenThietBi"]
+        if not str(fields.get("NhomThietBi") or "").strip():
+            fields["NhomThietBi"] = row["NhomThietBi"]
     return fields

@@ -36,6 +36,7 @@ Ngày hóa đơn, Nhóm thiết bị, Mail.
 | `3_DieuChuyen.xlsx` | `DieuChuyen` |
 | `4_KiemKe.xlsx` | `Data_Thietbi` (list kiểm kê dạng gộp) |
 | `5_PhanQuyen.xlsx` | `PhanQuyen` |
+| `6_LoaiThietBi.xlsx` | `Data_Loaithietbi` – danh mục loại thiết bị (Tên thiết bị, Mã phân loại tài sản, Nhóm thiết bị): chọn tên khi nhập mới → app tự điền Mã tài sản, Nhóm và sinh Mã chi tiết |
 
 Microsoft Lists → **+ Danh sách mới → Từ Excel** → chọn file → chọn bảng `tbl_...` → chỉnh kiểu cột theo sheet
 *HuongDan* → đặt tên list như bảng trên (hoặc giữ tên theo file: `1_ThietBi`, `2_Phong`, `3_DieuChuyen`, `4_KiemKe`, `5_PhanQuyen` – app tự nhận) → **Tạo** → xóa dòng mẫu. Tạo cả 5 list ở cùng một chỗ (cùng khu vực cá nhân

@@ -62,7 +62,18 @@ def build_demo_data() -> dict:
     def with_ids(rows):
         return [{**r, "id": str(i)} for i, r in enumerate(rows, start=1)]
 
+    loai = [
+        {"TenThietBi": ten, "MaPhanLoai": ma, "NhomThietBi": nhom} for ten, ma, nhom in [
+            ("Tivi", "111007", "Nhóm Công Nghệ Thông Tin"), ("Điện thoại", "111027", "Nhóm Công Nghệ Thông Tin"),
+            ("Máy chiếu", "111028", "Nhóm Công Nghệ Thông Tin"), ("Máy chấm công", "111032", "Nhóm Công Nghệ Thông Tin"),
+            ("Máy Tính Xách Tay", "111036", "Nhóm Công Nghệ Thông Tin"), ("Loa phát thanh", "111051", "Nhóm Thiết Bị Điện"),
+            ("Bơm chữa cháy", "111296", "Nhóm Phòng Cháy Chữa Cháy"), ("Máy May", "111306", "Nhóm Thiết Bị Điện"),
+            ("Màn hình LED", "111305", "Nhóm Công Nghệ Thông Tin"), ("Micro nói chung", "111304", "Nhóm Công Nghệ Thông Tin"),
+        ]
+    ]
+
     return {
+        schema.LOAI_TB: with_ids(loai),
         schema.PHAN_QUYEN: with_ids(phan_quyen),
         schema.PHONG: with_ids(phong),
         schema.THIET_BI: with_ids(thiet_bi),

@@ -39,6 +39,7 @@ PHONG = "Phong"
 DIEU_CHUYEN = "DieuChuyen"
 KIEM_KE = "KiemKe"
 PHAN_QUYEN = "PhanQuyen"
+LOAI_TB = "LoaiThietBi"
 
 # Mỗi list:
 #   sp_list: tên list mặc định trên SharePoint (đổi được trong secrets [sharepoint.lists])
@@ -138,6 +139,17 @@ LISTS: dict[str, dict] = {
             "HoTen": {"type": "text", "label": "Họ tên"},
             "VaiTro": {"type": "choice", "label": "Vai trò", "choices": ROLES},
             "ChucDanh": {"type": "text", "label": "Chức danh"},
+        },
+    },
+    # Danh mục loại thiết bị (giống list "Data_Loaithietbi"): chọn tên -> ra Mã tài sản + Nhóm thiết bị
+    LOAI_TB: {
+        "sp_list": "Data_Loaithietbi",
+        "aliases": ["6_LoaiThietBi", "LoaiThietBi"],  # tên khi tạo list từ file biểu mẫu
+        "columns": {
+            "TenThietBi": {"type": "text", "label": "Tên thiết bị"},
+            "MaPhanLoai": {"type": "text", "label": "Mã phân loại tài sản",
+                           "alt": ["Mã phân loại", "Mã phân loại TS", "Mã tài sản", "Mã loại"]},
+            "NhomThietBi": {"type": "text", "label": "Nhóm thiết bị"},
         },
     },
 }
