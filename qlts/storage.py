@@ -121,6 +121,7 @@ class SharePointStore:
         # Ánh xạ cột cố định: {"ThietBi": {"TenThietBi": "TenTB"}} (tên nội bộ hoặc tên hiển thị)
         self.column_map: dict = cfg.get("columns", {})
         self._columns: dict[str, dict] = {}
+        self._list_ids: dict[str, str] = {}
 
     @staticmethod
     def _app_token_provider(cfg: dict):
@@ -179,7 +180,22 @@ class SharePointStore:
         return self.list_names.get(list_name) or schema.LISTS[list_name]["sp_list"]
 
     def _list_url(self, list_name: str) -> str:
-        return f"/sites/{self.site_id}/lists/{requests.utils.quote(self.real_list_name(list_name))}"
+        return f"/sites/{self.site_id}/lists/{self.list_id(list_name)}"
+
+    def list_id(self, list_name: str) -> str:
+        """ID của list, tìm theo tên hiển thị hoặc theo tên trên đường dẫn (…/Lists/<tên>)."""
+        real = self.real_list_name(list_name)
+        if real not in self._list_ids:
+            data = self._request("GET", f"/sites/{self.site_id}/lists?$select=id,displayName,webUrl&$top=999")
+            wanted = _normalize(real)
+            for lst in data.get("value", []):
+                url_name = requests.utils.unquote(lst.get("webUrl", "").rstrip("/").split("/")[-1])
+                if wanted in (_normalize(lst.get("displayName", "")), _normalize(url_name)):
+                    self._list_ids[real] = lst["id"]
+                    break
+            else:
+                raise StorageError(f"Không tìm thấy list “{real}” trên site {self.cfg['site_path']}.")
+        return self._list_ids[real]
 
     # -- Dò cột --
     def sp_columns(self, list_name: str) -> list[dict]:

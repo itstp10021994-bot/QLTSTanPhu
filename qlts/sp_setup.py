@@ -53,11 +53,14 @@ def ensure_lists(store: SharePointStore, add_columns_to: set[str] | None = None)
     """Tạo list còn thiếu. Với list đã có, chỉ thêm cột thiếu nếu list nằm trong ``add_columns_to``."""
     site = store.site_id
     log = []
-    existing = existing_lists(store)
     for key, spec in schema.LISTS.items():
         name = store.real_list_name(key)
         cols = [column_def(c, s) for c, s in spec["columns"].items() if c != "Title"]
-        if name not in existing:
+        try:
+            list_id = store.list_id(key)
+        except StorageError:
+            list_id = None
+        if list_id is None:
             created = store._request("POST", f"/sites/{site}/lists", json={
                 "displayName": name, "columns": cols, "list": {"template": "genericList"},
             })
@@ -76,7 +79,7 @@ def ensure_lists(store: SharePointStore, add_columns_to: set[str] | None = None)
         missing = [c for c in cols if c["name"] not in found]
         if missing and add_columns_to and key in add_columns_to:
             for col in missing:
-                store._request("POST", f"/sites/{site}/lists/{existing[name]}/columns", json=col)
+                store._request("POST", f"/sites/{site}/lists/{list_id}/columns", json=col)
             store._columns.pop(key, None)
             log.append(f"List {name} đã có, thêm cột: {', '.join(c['displayName'] for c in missing)}")
         elif missing:

@@ -60,10 +60,23 @@ TenThietBi, GiaTri, NgayHoaDon, NhomThietBi, Mail`.
 | Yêu cầu với người dùng | Có quyền Edit trên site/list chứa dữ liệu | Không |
 | Cấu hình | `[auth]` có `expose_tokens`, `[sharepoint]` **không** có `client_secret` | `[sharepoint]` có `tenant_id/client_id/client_secret` |
 
-> **Về Power Automate:** app Python không cần Power Automate. Bản Power Automate miễn phí đi kèm
-> Microsoft 365 không gọi được từ bên ngoài (trigger *When an HTTP request is received* là Premium),
-> nên app kết nối thẳng SharePoint qua Microsoft Graph bằng tài khoản của bạn. Các flow Power Automate
-> hiện có (gửi mail khi thêm thiết bị…) vẫn chạy bình thường vì dữ liệu vẫn nằm trên cùng list.
+### List cá nhân (Microsoft Lists / OneDrive) và Power Automate
+
+Nếu list `Data_Thietbichitiet` nằm trong khu vực cá nhân của bạn (địa chỉ dạng
+`https://<ten>-my.sharepoint.com/personal/<email>/Lists/...`), app vẫn dùng được – chỉ cần dán link đó vào
+`list_url`. Lưu ý:
+
+- App đọc/ghi **trực tiếp** list bằng tài khoản người đang đăng nhập, giống Power Apps với connector SharePoint.
+  Không cần Power Automate làm trung gian.
+- Ai dùng app (giáo viên quản lý phòng, ban kiểm kê…) phải được bạn **chia sẻ quyền Chỉnh sửa** trên list –
+  giống như khi họ dùng app Power Apps hiện tại.
+- Các list phụ (Phong, KiemKe, DieuChuyen, PhanQuyen) sẽ được tạo cùng chỗ với list thiết bị khi bấm
+  *Khởi tạo SharePoint*; nhớ chia sẻ cả các list này.
+- Các flow Power Automate bạn đang có (vd *When an item is created* → gửi mail) **vẫn chạy**, vì app ghi vào đúng list đó.
+- App Python không gọi flow Power Automate được với bản miễn phí: trigger *When a HTTP request is received* là
+  tính năng **Premium**.
+- Về lâu dài nên chuyển list sang một **site nhóm** (Teams/SharePoint site) để dữ liệu không phụ thuộc tài khoản
+  cá nhân (nếu tài khoản bị khóa khi nghỉ việc, OneDrive và list cá nhân sẽ bị xóa theo).
 
 ## Bước 1 – Đăng ký ứng dụng (App registration)
 
@@ -83,8 +96,9 @@ TenThietBi, GiaTri, NgayHoaDon, NhomThietBi, Mail`.
 5. Điền vào secrets (xem `.streamlit/secrets.toml.example`):
    - `[auth]`: `client_id`, `client_secret`, tenant ID trong `server_metadata_url`, `redirect_uri`,
      một chuỗi ngẫu nhiên cho `cookie_secret`; giữ nguyên `expose_tokens` và `client_kwargs`.
-   - `[sharepoint]`: `hostname` và `site_path` của site chứa list
-     (ví dụ `https://igc.sharepoint.com/sites/TanPhuThietBi` → hostname `igc.sharepoint.com`, site_path `/sites/TanPhuThietBi`).
+   - `[sharepoint]`: `list_url` = link của list thiết bị (mở list trên trình duyệt, copy thanh địa chỉ;
+     không dùng link "Chia sẻ"). Ví dụ list cá nhân:
+     `https://igcschool-my.sharepoint.com/personal/ten_igcschool_edu_vn/Lists/Data_Thietbichitiet/AllItems.aspx`.
    - `[app] admin_emails`: email của bạn.
 6. Mở app, đăng nhập, vào **Phân quyền → Khởi tạo SharePoint**: bấm *Kiểm tra* để xem cột của
    `Data_Thietbichitiet` đã khớp chưa, rồi *Tạo list còn thiếu* (cần quyền Owner; list/dữ liệu có sẵn được giữ nguyên).

@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from . import schema, storage
-from .config import app_setting
+from .config import app_setting, sharepoint_config_problem
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
@@ -40,7 +40,11 @@ def header(user_name: str) -> None:
         unsafe_allow_html=True,
     )
     if storage.is_demo():
-        st.caption(":orange[● Chế độ demo] — dữ liệu lưu cục bộ, chưa kết nối SharePoint.")
+        problem = sharepoint_config_problem()
+        if problem:
+            st.warning("Đang chạy chế độ demo vì cấu hình SharePoint chưa hợp lệ. " + problem)
+        else:
+            st.caption(":orange[● Chế độ demo] — dữ liệu lưu cục bộ, chưa kết nối SharePoint.")
 
 
 def footer() -> None:
