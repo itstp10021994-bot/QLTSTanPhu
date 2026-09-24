@@ -1,6 +1,7 @@
 """Đọc cấu hình từ ``st.secrets`` (Streamlit Cloud / .streamlit/secrets.toml)
 hoặc biến môi trường."""
 
+import json
 import os
 import re
 from urllib.parse import unquote, urlparse
@@ -52,6 +53,27 @@ def placeholder_fields() -> list[str]:
     return found
 
 
+def bridge_config() -> dict | None:
+    """Cấu hình cầu nối Power Automate (mục [powerautomate]: flow_url, key)."""
+    pa = dict(_secrets().get("powerautomate", {}))
+    if pa.get("flow_url") and pa.get("key") and not placeholder_in(pa):
+        return pa
+    return None
+
+
+def placeholder_in(value) -> bool:
+    return bool(re.search(r"<[^<>]+>", json.dumps(value, ensure_ascii=False)))
+
+
+def login_mode() -> str:
+    """microsoft (st.login) | otp (mã qua email, dùng cầu nối Power Automate) | demo."""
+    if auth_configured():
+        return "microsoft"
+    if bridge_config():
+        return "otp"
+    return "demo"
+
+
 def sharepoint_config() -> dict | None:
     """Cấu hình SharePoint, hoặc ``None`` nếu chưa cấu hình (chế độ demo).
 
@@ -62,6 +84,14 @@ def sharepoint_config() -> dict | None:
     """
     sp = dict(_secrets().get("sharepoint", {}))
     sp["lists"] = dict(sp.get("lists", {}))
+    bridge = bridge_config()
+    if bridge:
+        # Chế độ cầu nối: flow Power Automate đọc/ghi site đã chọn sẵn trong flow
+        if sp.get("list_url"):
+            parsed = parse_sharepoint_url(sp["list_url"])
+            if parsed.get("list"):
+                sp["lists"].setdefault("ThietBi", parsed["list"])
+        return {**sp, **bridge, "mode": "bridge", "hostname": "", "site_path": "(site trong flow Power Automate)"}
     # Cách đơn giản nhất: dán link của list thiết bị (hoặc của site) vào list_url / site_url
     for key in ("list_url", "site_url"):
         if sp.get(key):
@@ -88,6 +118,10 @@ def sharepoint_config() -> dict | None:
 def sharepoint_config_problem() -> str | None:
     """Lý do mục [sharepoint] đã khai báo nhưng chưa dùng được (để báo cho người dùng)."""
     sp = _secrets().get("sharepoint")
+    pa = _secrets().get("powerautomate")
+    if pa and not bridge_config():
+        return ("Mục [powerautomate] chưa đủ: cần `flow_url` (URL của bước “When a HTTP request is received”) "
+                "và `key` (mã bí mật trùng với flow).")
     if not sp or sharepoint_config():
         return None
     link = sp.get("list_url") or sp.get("site_url")

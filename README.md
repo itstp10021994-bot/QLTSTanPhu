@@ -68,6 +68,23 @@ Các khóa cột của list thiết bị: `STT, MaTaiSan, MaChiTiet, ChiTiet, Da
 NguoiSuDung, NgayMua, QuanLyThietBi, TinhTrang, QuanLyPhong, PhanQuyenTB, MaSAP, ThoiHanBaoHanh, GhiChu,
 TenThietBi, GiaTri, NgayHoaDon, NhomThietBi, Mail`.
 
+## Kết nối qua Power Automate (không cần App registration) – khuyên dùng nếu không có quyền Entra
+
+Có **Power Automate Premium** nhưng không được tạo App registration? Làm theo
+[`docs/power_automate_bridge.md`](docs/power_automate_bridge.md): tạo 1 flow (HTTP trigger → Send an HTTP request
+to SharePoint / Send an email), rồi chỉ cần Secrets:
+
+```toml
+[app]
+admin_emails = ["email_admin@truong.edu.vn"]
+
+[powerautomate]
+flow_url = "<HTTP URL của flow>"
+key = "<mã bí mật trùng với flow>"
+```
+
+Người dùng đăng nhập bằng **mã 6 số gửi qua email trường**; app đọc/ghi SharePoint bằng tài khoản chủ flow.
+
 ## Hai chế độ kết nối SharePoint
 
 | | **Chế độ 1 – Tài khoản cá nhân** (khuyên dùng) | Chế độ 2 – Quyền ứng dụng |

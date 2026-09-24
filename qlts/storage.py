@@ -384,6 +384,168 @@ class SharePointStore:
 
 
 # ---------------------------------------------------------------------------
+# Cầu nối Power Automate (không cần App registration)
+# ---------------------------------------------------------------------------
+REST_KINDS = {
+    "Text": "text", "Note": "text", "Number": "number", "Currency": "currency", "DateTime": "dateTime",
+    "Choice": "choice", "MultiChoice": "choice", "Boolean": "boolean", "User": "personOrGroup",
+    "UserMulti": "personOrGroup", "Lookup": "lookup", "LookupMulti": "lookup", "Calculated": "calculated",
+    "URL": "text", "Integer": "number", "Counter": "number",
+}
+
+
+def _error_text(data) -> str:
+    """Lấy thông báo lỗi từ phản hồi SharePoint REST / flow (nhiều dạng khác nhau)."""
+    if not isinstance(data, dict):
+        return str(data)[:300]
+    err = data.get("odata.error") or data.get("error") or data.get("raw") or ""
+    if isinstance(err, dict):
+        msg = err.get("message", "")
+        return msg.get("value", "") if isinstance(msg, dict) else str(msg)
+    return str(err)
+
+
+class BridgeStore(SharePointStore):
+    """Đọc/ghi SharePoint REST qua một flow Power Automate (HTTP trigger -> Send an HTTP request to SharePoint).
+
+    App gửi {"key", "action": "sp", "method", "uri", "body"}; flow trả về status + body của SharePoint.
+    """
+
+    PARALLEL = 6  # số yêu cầu gửi đồng thời khi ghi hàng loạt
+
+    def __init__(self, cfg: dict):
+        super().__init__(cfg, token_provider=lambda: "")
+        self.flow_url = cfg["flow_url"]
+        self.key = cfg["key"]
+
+    # -- gọi flow --
+    def _call(self, payload: dict, timeout: int = 120):
+        body = {"key": self.key, **payload}
+        for attempt in range(4):
+            try:
+                resp = requests.post(self.flow_url, json=body, timeout=timeout)
+            except requests.RequestException as exc:
+                raise StorageError(f"Không gọi được flow Power Automate: {exc}") from exc
+            if resp.status_code in (429, 502, 503, 504) and attempt < 3:
+                time.sleep(int(resp.headers.get("Retry-After", 2 ** attempt)))
+                continue
+            break
+        try:
+            data = resp.json() if resp.content else {}
+        except ValueError:
+            data = {"raw": resp.text[:500]}
+        if resp.status_code >= 400:
+            msg = _error_text(data)
+            if resp.status_code == 403 and (not msg or msg == "forbidden"):
+                msg = "flow từ chối – kiểm tra `key` trong Secrets trùng với mã trong flow."
+            raise StorageError(f"SharePoint (qua Power Automate) lỗi {resp.status_code}: {msg or str(data)[:300]}")
+        return data
+
+    def rest(self, method: str, uri: str, body: dict | None = None):
+        return self._call({"action": "sp", "method": method, "uri": uri, "body": body or {}})
+
+    def send_mail(self, to: str, subject: str, html: str) -> None:
+        self._call({"action": "mail", "to": to, "subject": subject, "html": html})
+
+    # -- site / list --
+    @property
+    def site_id(self) -> str:  # không dùng Graph
+        return "bridge"
+
+    def site_info(self) -> dict:
+        return self.rest("GET", "_api/web?$select=Title,Url")
+
+    def list_id(self, list_name: str) -> str:
+        if list_name in self._list_ids:
+            return self._list_ids[list_name]
+        if self.list_names.get(list_name):
+            candidates = [self.list_names[list_name]]
+        else:
+            candidates = [schema.LISTS[list_name]["sp_list"], *schema.LISTS[list_name].get("aliases", [])]
+        data = self.rest("GET", "_api/web/lists?$select=Id,Title,Hidden,RootFolder/ServerRelativeUrl"
+                                "&$expand=RootFolder&$filter=Hidden eq false")
+        lists = data.get("value", [])
+        for cand in candidates:
+            wanted = _normalize(cand)
+            for lst in lists:
+                url = (lst.get("RootFolder") or {}).get("ServerRelativeUrl", "")
+                url_name = requests.utils.unquote(url.rstrip("/").split("/")[-1])
+                if wanted in (_normalize(lst.get("Title", "")), _normalize(url_name)):
+                    self._list_ids[list_name] = lst["Id"]
+                    self._resolved_names[list_name] = lst.get("Title") or cand
+                    self.list_web_urls[self._resolved_names[list_name]] = url
+                    return lst["Id"]
+        raise StorageError(f"Không tìm thấy list “{' / '.join(candidates)}” trên site của flow.")
+
+    def _list_uri(self, list_name: str) -> str:
+        return f"_api/web/lists(guid'{self.list_id(list_name)}')"
+
+    def sp_columns(self, list_name: str) -> list[dict]:
+        data = self.rest("GET", f"{self._list_uri(list_name)}/fields?$select=InternalName,Title,TypeAsString,"
+                                "ReadOnlyField,Hidden&$filter=Hidden eq false")
+        cols = []
+        for f in data.get("value", []):
+            kind = REST_KINDS.get(f.get("TypeAsString", ""), "text")
+            cols.append({"name": f["InternalName"], "displayName": f.get("Title", ""), kind: {},
+                         "readOnly": bool(f.get("ReadOnlyField")) and f["InternalName"] != "Title"})
+        return cols
+
+    # -- CRUD --
+    def list_items(self, list_name: str) -> list[dict]:
+        cols = {k: c for k, c in self.columns(list_name).items() if c["kind"] not in ("personOrGroup", "lookup")}
+        select = ",".join(sorted({c["name"] for c in cols.values()} | {"Id"}))
+        uri = f"{self._list_uri(list_name)}/items?$select={select}&$top=5000"
+        reverse = {c["name"]: key for key, c in cols.items()}
+        rows = []
+        while uri:
+            data = self.rest("GET", uri)
+            for item in data.get("value", []):
+                row = {reverse[k]: v for k, v in item.items() if k in reverse}
+                row["id"] = str(item["Id"])
+                rows.append(row)
+            nxt = data.get("odata.nextLink") or data.get("@odata.nextLink") or ""
+            uri = "_api/" + nxt.split("/_api/", 1)[1] if "/_api/" in nxt else ""
+        return rows
+
+    def create(self, list_name: str, fields: dict) -> str:
+        item = self.rest("POST", f"{self._list_uri(list_name)}/items", self._create_payload(list_name, fields))
+        return str(item.get("Id") or item.get("ID"))
+
+    def update(self, list_name: str, item_id: str, fields: dict) -> None:
+        payload = self._to_sp(list_name, fields)
+        if payload:
+            self.rest("PATCH", f"{self._list_uri(list_name)}/items({int(item_id)})", payload)
+
+    def delete(self, list_name: str, item_id: str) -> None:
+        self.rest("DELETE", f"{self._list_uri(list_name)}/items({int(item_id)})")
+
+    def batch(self, list_name: str, ops: list[tuple], progress=None) -> list[str]:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        self.columns(list_name)  # dò cột một lần trước khi chạy song song
+
+        def run(op):
+            if op[0] == "create":
+                self.create(list_name, op[1])
+            elif op[0] == "update":
+                self.update(list_name, op[1], op[2])
+            else:
+                self.delete(list_name, op[1])
+
+        errors, done = [], 0
+        with ThreadPoolExecutor(max_workers=self.PARALLEL) as pool:
+            futures = {pool.submit(run, op): i for i, op in enumerate(ops)}
+            for fut in as_completed(futures):
+                done += 1
+                exc = fut.exception()
+                if exc:
+                    errors.append(f"Dòng {futures[fut] + 1}: {exc}")
+                if progress:
+                    progress(done / len(ops))
+        return sorted(errors)
+
+
+# ---------------------------------------------------------------------------
 # Lưu cục bộ (demo)
 # ---------------------------------------------------------------------------
 class LocalStore:
@@ -475,6 +637,8 @@ def get_store():
     cfg = sharepoint_config()
     if not cfg:
         return LocalStore(LOCAL_DB)
+    if cfg["mode"] == "bridge":
+        return BridgeStore(cfg)
     if cfg["mode"] == "delegated":
         return SharePointStore(cfg, token_provider=_user_token)
     return SharePointStore(cfg)
@@ -482,6 +646,10 @@ def get_store():
 
 def is_demo() -> bool:
     return isinstance(get_store(), LocalStore)
+
+
+def is_bridge() -> bool:
+    return isinstance(get_store(), BridgeStore)
 
 
 def _cache_scope() -> str:

@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
+import secrets
 import time
 from dataclasses import dataclass, field
 
 import streamlit as st
 
 from . import schema, storage
-from .config import admin_emails, auth_configured, placeholder_fields, sharepoint_config
+from .config import (admin_emails, app_setting, auth_configured, bridge_config, login_mode, placeholder_fields,
+                     sharepoint_config)
 
 
 @dataclass
@@ -111,6 +115,109 @@ def relogin_screen(message: str = "Phiên làm việc với SharePoint đã hế
         st.login()
 
 
+# ---------------------------------------------------------------------------
+# Đăng nhập bằng mã gửi qua email (chế độ cầu nối Power Automate, không cần App registration)
+# ---------------------------------------------------------------------------
+OTP_TTL = 600  # giây
+OTP_COOLDOWN = 60
+OTP_MAX_TRIES = 5
+SESSION_PARAM = "s"
+
+
+def _session_secret() -> bytes:
+    return (str(app_setting("session_secret", "")) or bridge_config()["key"] + "|qlts-session").encode()
+
+
+def _sign(payload: str) -> str:
+    return hmac.new(_session_secret(), payload.encode(), hashlib.sha256).hexdigest()[:40]
+
+
+def make_session_token(email: str) -> str:
+    days = float(app_setting("session_days", 7))
+    payload = f"{email}|{int(time.time() + days * 86400)}"
+    return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=") + "." + _sign(payload)
+
+
+def read_session_token(token: str) -> str | None:
+    try:
+        raw, sig = token.split(".", 1)
+        payload = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode()
+        email, exp = payload.rsplit("|", 1)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not hmac.compare_digest(sig, _sign(payload)) or int(exp) < time.time():
+        return None
+    return email
+
+
+def known_emails() -> set[str]:
+    """Email được phép đăng nhập: có trong Phân quyền, danh mục phòng, cột Quản lý phòng, hoặc admin_emails."""
+    emails = set(admin_emails())
+    try:
+        emails |= set(storage.load(schema.PHAN_QUYEN)["Title"].str.strip().str.lower())
+        emails |= set(storage.load(schema.PHONG)["NguoiQuanLy"].str.strip().str.lower())
+        emails |= set(storage.load(schema.THIET_BI)["QuanLyPhong"].str.strip().str.lower())
+    except storage.StorageError:
+        pass
+    return {e for e in emails if "@" in e}
+
+
+def _hash_code(email: str, code: str) -> str:
+    return hmac.new(_session_secret(), f"{email}|{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def _login_screen_otp() -> None:
+    st.markdown("### Đăng nhập")
+    st.write("Nhập email trường của bạn, ứng dụng sẽ gửi **mã đăng nhập 6 số** vào hộp thư.")
+    pending = st.session_state.get("otp")
+
+    with st.form("otp_email"):
+        email = st.text_input("Email", value=pending["email"] if pending else "",
+                              placeholder="ten@igcschool.edu.vn").strip().lower()
+        send = st.form_submit_button("Gửi mã", icon=":material/mail:")
+    if send:
+        if "@" not in email:
+            st.error("Email không hợp lệ.")
+        elif pending and pending["email"] == email and time.time() - pending["sent_at"] < OTP_COOLDOWN:
+            st.warning(f"Vui lòng chờ {OTP_COOLDOWN - int(time.time() - pending['sent_at'])} giây rồi gửi lại.")
+        elif email not in known_emails():
+            st.error("Email này chưa được cấp quyền sử dụng ứng dụng. Liên hệ quản trị viên.")
+        else:
+            code = f"{secrets.randbelow(10**6):06d}"
+            try:
+                storage.get_store().send_mail(
+                    email, f"Mã đăng nhập Ứng dụng quản lý thiết bị: {code}",
+                    f"<p>Mã đăng nhập của bạn là <b style='font-size:20px'>{code}</b>.</p>"
+                    f"<p>Mã có hiệu lực {OTP_TTL // 60} phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>",
+                )
+            except storage.StorageError as exc:
+                st.error(f"Không gửi được email: {exc}")
+            else:
+                st.session_state["otp"] = pending = {
+                    "email": email, "hash": _hash_code(email, code), "exp": time.time() + OTP_TTL,
+                    "sent_at": time.time(), "tries": 0,
+                }
+                st.success(f"Đã gửi mã tới {email}. Kiểm tra hộp thư (cả mục Spam/Junk).")
+
+    if not pending:
+        return
+    with st.form("otp_code"):
+        code = st.text_input("Mã 6 số", max_chars=6).strip()
+        ok = st.form_submit_button("Đăng nhập", type="primary", icon=":material/login:")
+    if ok:
+        if time.time() > pending["exp"]:
+            st.error("Mã đã hết hạn, vui lòng gửi mã mới.")
+        elif pending["tries"] >= OTP_MAX_TRIES:
+            st.error("Nhập sai quá nhiều lần, vui lòng gửi mã mới.")
+        elif not hmac.compare_digest(_hash_code(pending["email"], code), pending["hash"]):
+            pending["tries"] += 1
+            st.error(f"Mã không đúng (còn {OTP_MAX_TRIES - pending['tries']} lần thử).")
+        else:
+            st.session_state.pop("otp", None)
+            st.query_params[SESSION_PARAM] = make_session_token(pending["email"])
+            st.rerun()
+
+
 def current_user() -> CurrentUser | None:
     """Người dùng hiện tại; ``None`` nếu chưa đăng nhập (màn hình đăng nhập đã được vẽ)."""
     if auth_configured():
@@ -124,6 +231,20 @@ def current_user() -> CurrentUser | None:
         email = st.user.get("email") or st.user.get("preferred_username") or ""
         return _build_user(email, st.user.get("name") or "")
 
+    if login_mode() == "otp":
+        # Streamlit xóa query params khi chuyển trang -> giữ token trong session_state và ghi lại lên URL
+        # (để tải lại trang / mở lại dấu trang vẫn còn đăng nhập)
+        token = st.query_params.get(SESSION_PARAM) or st.session_state.get("session_token", "")
+        email = read_session_token(token)
+        if not email:
+            st.session_state.pop("session_token", None)
+            _login_screen_otp()
+            return None
+        st.session_state["session_token"] = token
+        if st.query_params.get(SESSION_PARAM) != token:
+            st.query_params[SESSION_PARAM] = token
+        return _build_user(email)
+
     email = st.session_state.get("demo_email")
     if not email:
         _login_screen_demo()
@@ -134,6 +255,10 @@ def current_user() -> CurrentUser | None:
 def logout() -> None:
     if auth_configured():
         st.logout()
+    elif login_mode() == "otp":
+        st.query_params.pop(SESSION_PARAM, None)
+        st.session_state.pop("session_token", None)
+        st.rerun()
     else:
         st.session_state.pop("demo_email", None)
         st.rerun()

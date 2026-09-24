@@ -26,6 +26,11 @@ if not storage.is_demo() and st.button("Ghi thử 1 dòng (rồi xóa)", icon=":
     status, message = diagnostics.write_test()
     (st.success if status == diagnostics.OK else st.error)(message)
 
+if storage.is_bridge() and st.button("Gửi thử email cho tôi", icon=":material/mail:",
+                                     help="Kiểm tra nhánh gửi mail của flow (dùng cho mã đăng nhập)."):
+    status, message = diagnostics.mail_test(auth.require().email)
+    (st.success if status == diagnostics.OK else st.error)(message)
+
 store = storage.get_store()
 if storage.is_demo():
     st.stop()
@@ -33,8 +38,10 @@ if storage.is_demo():
 cfg = store.cfg
 st.divider()
 st.markdown(
-    f"Site: `https://{cfg['hostname']}/{cfg['site_path'].strip('/')}`  \n"
-    f"Chế độ truy cập: **{'Quyền của người đăng nhập' if cfg['mode'] == 'delegated' else 'Quyền ứng dụng'}**"
+    ("Site: **do flow Power Automate chọn**  \n" if cfg["mode"] == "bridge" else
+     f"Site: `https://{cfg['hostname']}/{cfg['site_path'].strip('/')}`  \n")
+    + "Chế độ truy cập: **" + {"delegated": "Quyền của người đăng nhập", "app": "Quyền ứng dụng",
+                               "bridge": "Qua flow Power Automate (tài khoản chủ flow)"}[cfg["mode"]] + "**"
 )
 
 st.markdown("##### 1. Kiểm tra cột của từng list")
@@ -51,6 +58,10 @@ if st.button("Kiểm tra", icon=":material/fact_check:"):
         st.error(f"Không đọc được list {names[key]}: {exc}")
 
 st.markdown("##### 2. Tạo các list còn thiếu")
+if storage.is_bridge():
+    st.info("Ở chế độ Power Automate, hãy tạo list trên SharePoint bằng các file biểu mẫu "
+            "(Phân quyền → Xuất / nhập biểu mẫu → Tất cả biểu mẫu), rồi bấm Kiểm tra ở trên.")
+    st.stop()
 st.write(
     "Tạo các list ứng dụng cần mà site chưa có (Phong, DieuChuyen, KiemKe, PhanQuyen...). "
     "List và dữ liệu đã có được giữ nguyên. Tài khoản của bạn cần quyền **Owner** trên site."

@@ -9,7 +9,8 @@ import time
 import streamlit as st
 
 from . import schema, storage
-from .config import _secrets, auth_configured, parse_sharepoint_url, placeholder_fields, sharepoint_config
+from .config import (_secrets, auth_configured, bridge_config, parse_sharepoint_url, placeholder_fields,
+                     sharepoint_config)
 
 OK, WARN, FAIL = "✅", "⚠️", "❌"
 GRAPH_AUDIENCES = {"00000003-0000-0000-c000-000000000000", "https://graph.microsoft.com"}
@@ -31,6 +32,14 @@ def config_checks() -> list[tuple[str, str, str]]:
     pending = placeholder_fields()
     if pending:
         out.append((FAIL, "Giá trị mẫu <...> chưa thay", ", ".join(pending)))
+    pa = sec.get("powerautomate")
+    if pa:
+        if bridge_config():
+            out.append((OK, "Mục [powerautomate]", "Có flow_url và key → đọc/ghi SharePoint qua flow Power Automate."))
+            out.append((OK, "Đăng nhập", "Bằng mã 6 số gửi qua email (flow gửi mail)."))
+        else:
+            out.append((FAIL, "Mục [powerautomate]", "Thiếu `flow_url` hoặc `key` (hoặc còn giá trị mẫu <...>)."))
+        return out
     link = sp.get("list_url") or sp.get("site_url")
     if not sp:
         out.append((FAIL, "Mục [sharepoint] trong Secrets", "Chưa có. Streamlit → Manage app → Settings → Secrets, "
@@ -99,8 +108,12 @@ def sharepoint_checks() -> list[tuple[str, str, str]]:
         return [(FAIL, "Kết nối SharePoint", "App đang chạy DEMO – sửa các mục ❌ ở trên.")]
     out = []
     try:
-        site = store._request("GET", f"/sites/{store.site_id}?$select=displayName,webUrl")
-        out.append((OK, "Truy cập site", f"{site.get('displayName', '')} – {site.get('webUrl', '')}"))
+        if storage.is_bridge():
+            web = store.site_info()
+            out.append((OK, "Flow Power Automate → site", f"{web.get('Title', '')} – {web.get('Url', '')}"))
+        else:
+            site = store._request("GET", f"/sites/{store.site_id}?$select=displayName,webUrl")
+            out.append((OK, "Truy cập site", f"{site.get('displayName', '')} – {site.get('webUrl', '')}"))
     except storage.TokenExpired:
         raise
     except storage.StorageError as exc:
@@ -132,3 +145,13 @@ def write_test() -> tuple[str, str]:
         raise
     except storage.StorageError as exc:
         return FAIL, f"Không ghi được: {str(exc)[:400]}"
+
+
+def mail_test(to: str) -> tuple[str, str]:
+    """Gửi thử email qua flow (chế độ cầu nối)."""
+    try:
+        storage.get_store().send_mail(to, "Kiểm tra kết nối – Ứng dụng quản lý thiết bị",
+                                      "<p>Flow Power Automate gửi email thành công.</p>")
+        return OK, f"Đã gửi email thử tới {to} – kiểm tra hộp thư."
+    except storage.StorageError as exc:
+        return FAIL, f"Không gửi được: {str(exc)[:400]}"
