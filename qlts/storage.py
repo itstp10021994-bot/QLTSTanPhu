@@ -126,7 +126,8 @@ class SharePointStore:
         # Ánh xạ cột cố định: {"ThietBi": {"TenThietBi": "TenTB"}} (tên nội bộ hoặc tên hiển thị)
         self.column_map: dict = cfg.get("columns", {})
         self._columns: dict[str, dict] = {}
-        self._list_ids: dict[str, str] = {}
+        self._list_ids: dict[str, str] = {}  # khóa list trong app -> ID list SharePoint
+        self._resolved_names: dict[str, str] = {}
         self.list_web_urls: dict[str, str] = {}
 
     @staticmethod
@@ -183,26 +184,47 @@ class SharePointStore:
         return self._site_id
 
     def real_list_name(self, list_name: str) -> str:
-        return self.list_names.get(list_name) or schema.LISTS[list_name]["sp_list"]
+        """Tên list trên SharePoint: tên đã tìm thấy > khai báo trong secrets > tên mặc định."""
+        return (self._resolved_names.get(list_name) or self.list_names.get(list_name)
+                or schema.LISTS[list_name]["sp_list"])
 
     def _list_url(self, list_name: str) -> str:
         return f"/sites/{self.site_id}/lists/{self.list_id(list_name)}"
 
     def list_id(self, list_name: str) -> str:
-        """ID của list, tìm theo tên hiển thị hoặc theo tên trên đường dẫn (…/Lists/<tên>)."""
-        real = self.real_list_name(list_name)
-        if real not in self._list_ids:
-            data = self._request("GET", f"/sites/{self.site_id}/lists?$select=id,displayName,webUrl&$top=999")
-            wanted = _normalize(real)
-            for lst in data.get("value", []):
+        """ID của list, tìm theo tên hiển thị hoặc theo tên trên đường dẫn (…/Lists/<tên>).
+
+        Nếu không khai báo tên trong secrets, thử lần lượt tên mặc định và các tên thay thế
+        (vd "2_Phong" – tên khi tạo list từ file biểu mẫu 2_Phong.xlsx).
+        """
+        if list_name in self._list_ids:
+            return self._list_ids[list_name]
+        if self.list_names.get(list_name):
+            candidates = [self.list_names[list_name]]
+        else:
+            candidates = [schema.LISTS[list_name]["sp_list"], *schema.LISTS[list_name].get("aliases", [])]
+        data = self._request("GET", f"/sites/{self.site_id}/lists?$select=id,displayName,webUrl&$top=999")
+        lists = data.get("value", [])
+        for cand in candidates:
+            wanted = _normalize(cand)
+            for lst in lists:
                 url_name = requests.utils.unquote(lst.get("webUrl", "").rstrip("/").split("/")[-1])
                 if wanted in (_normalize(lst.get("displayName", "")), _normalize(url_name)):
-                    self._list_ids[real] = lst["id"]
-                    self.list_web_urls[real] = lst.get("webUrl", "")
-                    break
-            else:
-                raise StorageError(f"Không tìm thấy list “{real}” trên site {self.cfg['site_path']}.")
-        return self._list_ids[real]
+                    self._list_ids[list_name] = lst["id"]
+                    self._resolved_names[list_name] = lst.get("displayName") or cand
+                    self.list_web_urls[self._resolved_names[list_name]] = lst.get("webUrl", "")
+                    return lst["id"]
+        raise StorageError(f"Không tìm thấy list “{' / '.join(candidates)}” trên site {self.cfg['site_path']}.")
+
+    def resolve_all(self) -> None:
+        """Tìm trước tất cả list (để hiển thị đúng tên thật); bỏ qua list chưa có."""
+        for key in schema.LISTS:
+            try:
+                self.list_id(key)
+            except TokenExpired:
+                raise
+            except StorageError:
+                pass
 
     # -- Dò cột --
     def sp_columns(self, list_name: str) -> list[dict]:

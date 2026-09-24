@@ -103,9 +103,9 @@ def sharepoint_checks() -> list[tuple[str, str, str]]:
     except storage.StorageError as exc:
         return [(FAIL, "Truy cập site", str(exc)[:400])]
     for key in schema.LISTS:
-        name = store.real_list_name(key)
         try:
             store.list_id(key)
+            name = store.real_list_name(key)
             cols = store.columns(key)
             n_all = len(schema.LISTS[key]["columns"])
             status = OK if len(cols) == n_all else WARN
@@ -113,6 +113,7 @@ def sharepoint_checks() -> list[tuple[str, str, str]]:
         except storage.TokenExpired:
             raise
         except storage.StorageError:
+            name = " / ".join([schema.LISTS[key]["sp_list"], *schema.LISTS[key].get("aliases", [])])
             out.append((FAIL, f"List “{name}”", "Không tìm thấy trên site – tạo list hoặc khai báo tên trong [sharepoint.lists]."))
     return out
 

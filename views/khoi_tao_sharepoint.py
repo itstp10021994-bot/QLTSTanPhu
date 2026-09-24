@@ -39,6 +39,7 @@ st.markdown(
 
 st.markdown("##### 1. Kiểm tra cột của từng list")
 st.caption("App tự dò cột theo tên hiển thị. Cột ❌ sẽ để trống khi đọc và bị bỏ qua khi ghi.")
+store.resolve_all()
 names = {k: store.real_list_name(k) for k in schema.LISTS}
 key = st.selectbox("List", list(names), format_func=lambda k: names[k])
 if st.button("Kiểm tra", icon=":material/fact_check:"):

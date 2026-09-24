@@ -13,6 +13,8 @@ st.subheader("Xuất / nhập biểu mẫu")
 st.caption("Tải biểu mẫu Excel, xuất dữ liệu đang có trên SharePoint, hoặc nhập hàng loạt từ file Excel.")
 
 store = storage.get_store()
+if not storage.is_demo():
+    store.resolve_all()
 
 
 def real_name(key: str) -> str:

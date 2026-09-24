@@ -50,6 +50,7 @@ PHAN_QUYEN = "PhanQuyen"
 LISTS: dict[str, dict] = {
     THIET_BI: {
         "sp_list": "Data_Thietbichitiet",
+        "aliases": ["1_ThietBi", "ThietBi"],  # tên khi tạo list từ file biểu mẫu
         "columns": {
             "STT": {"type": "number", "label": "STT"},
             "MaTaiSan": {"type": "text", "label": "Mã tài sản"},
@@ -78,6 +79,7 @@ LISTS: dict[str, dict] = {
     },
     PHONG: {
         "sp_list": "Phong",
+        "aliases": ["2_Phong"],  # tên khi tạo list từ file biểu mẫu
         "columns": {
             "Title": {"type": "text", "label": "Mã phòng", "sp": "Title"},
             "TenPhong": {"type": "text", "label": "Tên phòng"},
@@ -88,6 +90,7 @@ LISTS: dict[str, dict] = {
     },
     DIEU_CHUYEN: {
         "sp_list": "DieuChuyen",
+        "aliases": ["3_DieuChuyen"],  # tên khi tạo list từ file biểu mẫu
         "columns": {
             "Title": {"type": "text", "label": "Mã chi tiết", "sp": "Title"},
             "TenThietBi": {"type": "text", "label": "Tên thiết bị"},
@@ -103,6 +106,7 @@ LISTS: dict[str, dict] = {
     # Mã tài sản + Đặc điểm + Nơi sử dụng trong một đợt kiểm kê.
     KIEM_KE: {
         "sp_list": "Data_Thietbi",
+        "aliases": ["4_KiemKe", "KiemKe"],  # tên khi tạo list từ file biểu mẫu
         "columns": {
             "MaTaiSan": {"type": "text", "label": "Mã số tài sản"},
             "STT": {"type": "number", "label": "STT"},
@@ -128,6 +132,7 @@ LISTS: dict[str, dict] = {
     },
     PHAN_QUYEN: {
         "sp_list": "PhanQuyen",
+        "aliases": ["5_PhanQuyen"],  # tên khi tạo list từ file biểu mẫu
         "columns": {
             "Title": {"type": "text", "label": "Email", "sp": "Title"},
             "HoTen": {"type": "text", "label": "Họ tên"},

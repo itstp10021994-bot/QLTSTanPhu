@@ -38,7 +38,7 @@ Ngày hóa đơn, Nhóm thiết bị, Mail.
 | `5_PhanQuyen.xlsx` | `PhanQuyen` |
 
 Microsoft Lists → **+ Danh sách mới → Từ Excel** → chọn file → chọn bảng `tbl_...` → chỉnh kiểu cột theo sheet
-*HuongDan* → đặt tên list như bảng trên → **Tạo** → xóa dòng mẫu. Tạo cả 5 list ở cùng một chỗ (cùng khu vực cá nhân
+*HuongDan* → đặt tên list như bảng trên (hoặc giữ tên theo file: `1_ThietBi`, `2_Phong`, `3_DieuChuyen`, `4_KiemKe`, `5_PhanQuyen` – app tự nhận) → **Tạo** → xóa dòng mẫu. Tạo cả 5 list ở cùng một chỗ (cùng khu vực cá nhân
 hoặc cùng site). **Không đổi tên cột** – app dò cột theo đúng tên trong file. Nếu đặt tên list khác, khai báo trong
 `[sharepoint.lists]`.
 
