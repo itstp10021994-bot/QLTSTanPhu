@@ -34,65 +34,99 @@ if missing:
             ui.flash(f"Đã thêm {len(missing)} phòng vào danh mục.")
             st.rerun()
 
-with st.form("add_room", clear_on_submit=True):
-    st.markdown("**Thêm phòng mới**")
-    c1, c2 = st.columns(2)
-    code = c1.text_input("Mã phòng (Nơi sử dụng) *", placeholder="VD: L1_PH103")
-    name = c2.text_input("Tên phòng")
-    c1, c2 = st.columns(2)
-    email = ui.user_picker(c1, "Người quản lý phòng", key="add_room_ql", blank="(Chưa có)")
-    ten = c2.text_input("Tên người quản lý", help="Để trống sẽ lấy họ tên theo danh sách người dùng.")
-    if st.form_submit_button("Thêm phòng", type="primary", icon=":material/add:"):
+ver = st.session_state.setdefault("phong_ver", 0)
+
+
+@st.dialog("Thêm phòng mới")
+def add_dialog() -> None:
+    code = st.text_input("Mã phòng (Nơi sử dụng) *", placeholder="VD: L1_PH103")
+    name = st.text_input("Tên phòng")
+    email = ui.user_picker(st, "Người quản lý phòng", key="add_room_ql", blank="(Chưa có)")
+    ten = st.text_input("Tên người quản lý", help="Để trống sẽ lấy họ tên theo danh sách người dùng.")
+    if st.button("Thêm phòng", type="primary", icon=":material/add:"):
         code = code.strip()
         if not code:
             st.error("Nhập mã phòng.")
         elif (phong["Title"].str.lower() == code.lower()).any():
             st.error(f"Phòng {code} đã có trong danh mục.")
         else:
+            email = email.strip().lower()
             ten = ten.strip() or thietbi.user_directory().get(email, "")
             storage.create(schema.PHONG, {"Title": code, "TenPhong": name.strip() or code,
-                                          "NguoiQuanLy": email.strip().lower(), "TenNguoiQuanLy": ten})
-            n = sync_items(code, email.strip().lower()) if email.strip() else 0
+                                          "NguoiQuanLy": email, "TenNguoiQuanLy": ten})
+            n = sync_items(code, email) if email else 0
             ui.flash(f"Đã thêm phòng {code}" + (f", cập nhật {n} thiết bị." if n else "."))
             st.rerun()
 
-st.markdown("##### Danh mục phòng")
-st.caption("Sửa trực tiếp trong bảng rồi bấm Lưu. Chỉ xóa được phòng không còn thiết bị.")
-view = phong[["id", "Title", "TenPhong", "NguoiQuanLy", "TenNguoiQuanLy"]].copy()
-view["SoTB"] = view["Title"].map(tb.groupby("NoiSuDung").size()).fillna(0).astype(int)
-view["Xoa"] = False
-edited = st.data_editor(
-    view, hide_index=True, width="stretch", key="phong_editor", disabled=["id", "Title", "SoTB"],
-    column_config={
-        "id": None, "Title": "Mã phòng", "TenPhong": "Tên phòng",
-        "NguoiQuanLy": "Email người quản lý", "TenNguoiQuanLy": "Tên người quản lý",
-        "SoTB": "Số thiết bị", "Xoa": st.column_config.CheckboxColumn("Xóa"),
-    },
-)
-if st.button("Lưu thay đổi", icon=":material/save:"):
-    original = view.set_index("id")
-    changes, synced = 0, 0
-    with st.spinner("Đang lưu..."):
-        for row in edited.itertuples(index=False):
-            if row.Xoa:
-                if row.SoTB:
-                    st.error(f"Phòng {row.Title} còn {row.SoTB} thiết bị, hãy điều chuyển trước khi xóa.")
-                    st.stop()
-                storage.delete(schema.PHONG, row.id)
-                changes += 1
-                continue
-            old = original.loc[row.id]
-            fields = {}
-            for k in ("TenPhong", "NguoiQuanLy", "TenNguoiQuanLy"):
-                val = (getattr(row, k) or "").strip()
-                if k == "NguoiQuanLy":
-                    val = val.lower()
-                if val != old[k]:
-                    fields[k] = val
-            if fields:
+
+@st.dialog("Sửa phòng")
+def edit_dialog(row) -> None:
+    st.text_input("Mã phòng", row.Title, disabled=True)
+    name = st.text_input("Tên phòng", row.TenPhong)
+    email = ui.user_picker(st, "Người quản lý phòng", default=row.NguoiQuanLy, key=f"edit_room_ql_{row.id}",
+                           blank="(Chưa có)")
+    auto = thietbi.user_directory().get(email, "") if email != row.NguoiQuanLy.strip().lower() else ""
+    ten = st.text_input("Tên người quản lý", auto or row.TenNguoiQuanLy, key=f"edit_room_ten_{row.id}_{email}")
+    if row.SoTB:
+        st.caption(f"Đổi người quản lý sẽ cập nhật cột Quản lý phòng của {row.SoTB} thiết bị trong phòng.")
+    if st.button("Lưu thay đổi", type="primary", icon=":material/save:"):
+        new = {"TenPhong": name.strip(), "NguoiQuanLy": email.strip().lower(), "TenNguoiQuanLy": ten.strip()}
+        fields = {k: v for k, v in new.items() if v != getattr(row, k)}
+        n = 0
+        if fields:
+            with st.spinner("Đang lưu..."):
                 storage.update(schema.PHONG, row.id, fields)
-                changes += 1
-            if fields.get("NguoiQuanLy"):
-                synced += sync_items(row.Title, fields["NguoiQuanLy"])
-    ui.flash(f"Đã lưu {changes} thay đổi" + (f", cập nhật Quản lý phòng cho {synced} thiết bị." if synced else "."))
-    st.rerun()
+                if "NguoiQuanLy" in fields and fields["NguoiQuanLy"]:
+                    n = sync_items(row.Title, fields["NguoiQuanLy"])
+        ui.flash((f"Đã cập nhật phòng {row.Title}" + (f", cập nhật Quản lý phòng cho {n} thiết bị." if n else "."))
+                 if fields else "Không có thay đổi nào.")
+        st.rerun()
+
+
+st.markdown("##### Danh mục phòng")
+c1, c2 = st.columns([1, 3], vertical_alignment="center")
+if c1.button("Thêm phòng", icon=":material/add:", width="stretch"):
+    add_dialog()
+kw = c2.text_input("Tìm", placeholder="Tìm theo mã phòng, tên phòng, người quản lý...", label_visibility="collapsed")
+view = phong[["id", "Title", "TenPhong", "NguoiQuanLy", "TenNguoiQuanLy"]].sort_values("Title").copy()
+view["SoTB"] = view["Title"].map(tb.groupby("NoiSuDung").size()).fillna(0).astype(int)
+if kw:
+    view = view[view.drop(columns=["id", "SoTB"]).apply(lambda r: kw.lower() in " ".join(r).lower(), axis=1)]
+view = view.reset_index(drop=True)
+
+actions = st.container()
+event = st.dataframe(
+    view, hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"phong_table_{ver}",
+    column_config={"id": None, "Title": "Mã phòng", "TenPhong": "Tên phòng", "NguoiQuanLy": "Email người quản lý",
+                   "TenNguoiQuanLy": "Tên người quản lý", "SoTB": st.column_config.NumberColumn("Số thiết bị")},
+)
+chosen = view.iloc[event.selection.rows]
+busy = chosen[chosen["SoTB"] > 0]
+
+
+def delete_selected() -> str | None:
+    errors = storage.batch(schema.PHONG, [("delete", i) for i in chosen["id"]])
+    if errors:
+        return "Có lỗi khi xóa:\n\n" + "\n\n".join(errors[:10])
+    st.session_state["phong_ver"] = ver + 1
+    ui.flash(f"Đã xóa {len(chosen)} phòng khỏi danh mục.")
+
+
+with actions:
+    edit_clicked, del_clicked = ui.selection_actions("phong", len(chosen),
+                                                     extra="Chỉ xóa được phòng không còn thiết bị.")
+if edit_clicked:
+    edit_dialog(chosen.iloc[0])
+if del_clicked:
+    if not busy.empty:
+        @st.dialog("Không thể xóa")
+        def _blocked():
+            st.warning("Các phòng sau còn thiết bị, hãy **điều chuyển** thiết bị đi trước khi xóa:\n\n"
+                       + "\n".join(f"- {r.Title}: {r.SoTB} thiết bị" for r in busy.itertuples()))
+            if st.button("Đóng", width="stretch"):
+                st.rerun()
+        _blocked()
+    else:
+        ui.confirm_dialog("Xóa phòng", f"Bạn có chắc muốn **xóa {len(chosen)} phòng** khỏi danh mục?",
+                          delete_selected,
+                          details=[f"{r.Title} – {r.TenPhong}" for r in chosen.itertuples()])

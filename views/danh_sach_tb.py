@@ -96,28 +96,38 @@ with tab_edit:
                 f"**{len(deleted)}** dòng xóa.", icon=":material/pending:")
     for p in problems:
         st.error(p)
-    confirm_delete = True
-    if deleted:
-        confirm_delete = st.checkbox(f"Xác nhận xóa {len(deleted)} thiết bị: " +
-                                     ", ".join(before.loc[deleted, "MaChiTiet"].head(10)) +
-                                     (" ..." if len(deleted) > 10 else ""))
-    c1, c2 = st.columns([1, 5])
-    save = c1.button("Lưu thay đổi", type="primary", icon=":material/save:",
-                     disabled=not (updates or creates or deleted) or bool(problems) or not confirm_delete)
-    if c2.button("Hủy thay đổi", icon=":material/undo:"):
-        st.session_state["ds_version"] = version + 1
-        st.rerun()
-    if save:
-        ops = [*updates, *creates, *(("delete", i) for i in deleted)]
+    ops = [*updates, *creates, *(("delete", i) for i in deleted)]
+
+    def save_all() -> str | None:
         bar = st.progress(0.0, text="Đang lưu lên SharePoint...")
         errors = storage.batch(TB, ops, progress=lambda f: bar.progress(f, text="Đang lưu lên SharePoint..."))
         bar.empty()
+        st.session_state["ds_version"] = version + 1
         if errors:
-            st.session_state["ds_version"] = version + 1
-            st.error(f"Lưu xong nhưng có {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:20]))
+            return f"Lưu xong nhưng có {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:20])
+        ui.flash(f"Đã lưu: {len(updates)} sửa, {len(creates)} thêm mới, {len(deleted)} xóa.")
+
+    c1, c2 = st.columns([1, 5])
+    save = c1.button("Lưu thay đổi", type="primary", icon=":material/save:",
+                     disabled=not ops or bool(problems))
+    if c2.button("Hủy thay đổi", icon=":material/undo:"):
+        st.session_state["ds_version"] = version + 1
+        st.rerun()
+    if save and deleted:
+        # Có dòng bị xóa -> hỏi lại trước khi ghi
+        ui.confirm_dialog(
+            "Xác nhận lưu thay đổi",
+            f"Bạn sắp **xóa {len(deleted)} thiết bị** khỏi SharePoint"
+            + (f" (kèm {len(updates)} dòng sửa, {len(creates)} dòng mới)" if updates or creates else "")
+            + ". Đồng ý?",
+            save_all, confirm_label="Đồng ý xóa & lưu",
+            details=[f"{r.MaChiTiet} – {getattr(r, 'TenThietBi', '')}" for r in before.loc[deleted].itertuples()],
+        )
+    elif save:
+        error = save_all()
+        if error:
+            st.error(error)
         else:
-            st.session_state["ds_version"] = version + 1
-            ui.flash(f"Đã lưu: {len(updates)} sửa, {len(creates)} thêm mới, {len(deleted)} xóa.")
             st.rerun()
 
 # ---------------------------------------------------------------------------

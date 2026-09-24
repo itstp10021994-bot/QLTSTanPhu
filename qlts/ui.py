@@ -21,6 +21,11 @@ CSS = """
 .qlts-school {font-size:.8rem; line-height:1.2; color:#1f3a93; font-weight:600}
 .qlts-title {color:#e00000; font-weight:700; font-size:1.35rem; text-align:center; flex:1}
 .qlts-user {color:#1f4e8c; font-weight:600; font-size:.95rem}
+.st-key-dlg_confirm button, [class*="st-key-act_del"] button {background:#d32f2f !important;
+  border-color:#d32f2f !important; color:#fff !important}
+.st-key-dlg_confirm button:hover, [class*="st-key-act_del"] button:hover {background:#b71c1c !important}
+[class*="st-key-act_del"] button:disabled {background:transparent !important; color:rgba(128,128,128,.6) !important;
+  border-color:rgba(128,128,128,.3) !important}
 .qlts-footer {text-align:center; font-style:italic; color:#1f4e8c; margin-top:2.5rem;
   border-top:1px solid rgba(128,128,128,.25); padding-top:.6rem; font-size:.9rem}
 </style>
@@ -164,3 +169,43 @@ def user_picker(container, label: str, default: str = "", key: str | None = None
                                 accept_new_options=True, placeholder="Gõ tên hoặc email để tìm...")
     value = (value or "").strip()
     return value.lower() if "@" in value else value
+
+
+def confirm_dialog(title: str, message: str, on_confirm, *, confirm_label: str = "Đồng ý xóa",
+                   details: list[str] | None = None) -> None:
+    """Hộp thoại hỏi xác nhận (dùng cho xóa). ``on_confirm()`` trả về chuỗi lỗi nếu thất bại."""
+
+    @st.dialog(title)
+    def _dialog():
+        st.markdown(message)
+        if details:
+            shown = details[:15]
+            st.markdown("\n".join(f"- {d}" for d in shown) + (f"\n- ... và {len(details) - 15} mục khác"
+                                                                if len(details) > 15 else ""))
+        st.caption("Thao tác này không thể hoàn tác.")
+        c1, c2 = st.columns(2)
+        if c1.button(confirm_label, key="dlg_confirm", icon=":material/delete_forever:", width="stretch"):
+            with st.spinner("Đang xử lý..."):
+                error = on_confirm()
+            if error:
+                st.error(error)
+                return
+            st.rerun()
+        if c2.button("Hủy", key="dlg_cancel", icon=":material/close:", width="stretch"):
+            st.rerun()
+
+    _dialog()
+
+
+def selection_actions(key: str, count: int, *, edit: bool = True, delete: bool = True, extra: str = ""):
+    """Thanh nút Sửa / Xóa cho các dòng đang chọn. Trả về (bấm_sửa, bấm_xóa)."""
+    cols = st.columns([1, 1, 4], vertical_alignment="center")
+    edit_clicked = cols[0].button("Sửa", key=f"act_edit_{key}", icon=":material/edit:", type="primary",
+                                  disabled=count != 1, width="stretch") if edit else False
+    del_clicked = cols[1].button(f"Xóa ({count})" if count > 1 else "Xóa", key=f"act_del_{key}",
+                                 icon=":material/delete:", disabled=count == 0, width="stretch") if delete else False
+    hint = "Tick ô đầu dòng để chọn." if count == 0 else f"Đã chọn {count} dòng."
+    if count > 1 and edit:
+        hint += " Chọn đúng 1 dòng để sửa."
+    cols[2].caption(hint + (" " + extra if extra else ""))
+    return edit_clicked, del_clicked
