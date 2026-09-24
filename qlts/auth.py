@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 import streamlit as st
 
 from . import schema, storage
-from .config import admin_emails, auth_configured, sharepoint_config
+from .config import admin_emails, auth_configured, placeholder_fields, sharepoint_config
 
 
 @dataclass
@@ -59,6 +59,14 @@ def _build_user(email: str, fallback_name: str = "") -> CurrentUser:
 def _login_screen_microsoft() -> None:
     st.markdown("### Đăng nhập")
     st.write("Vui lòng đăng nhập bằng tài khoản Microsoft 365 của trường.")
+    pending = placeholder_fields()
+    if pending:
+        st.error(
+            "Secrets còn giá trị mẫu dạng `<...>` chưa thay bằng giá trị thật: "
+            + ", ".join(f"`{p}`" for p in pending)
+            + ". Vào Streamlit → Manage app → Settings → Secrets để sửa, nếu không sẽ không đăng nhập được.",
+            icon=":material/error:",
+        )
     if st.button("Đăng nhập với Microsoft", type="primary", icon=":material/login:"):
         st.login()
 

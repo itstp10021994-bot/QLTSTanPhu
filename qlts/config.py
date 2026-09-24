@@ -34,6 +34,24 @@ def parse_sharepoint_url(url: str) -> dict:
     return out
 
 
+def placeholder_fields() -> list[str]:
+    """Các ô trong Secrets còn để giá trị mẫu dạng <...> (chưa thay bằng giá trị thật)."""
+    found = []
+
+    def walk(prefix: str, value) -> None:
+        if isinstance(value, dict):
+            for k, v in value.items():
+                walk(f"{prefix}.{k}" if prefix else k, v)
+        elif isinstance(value, (list, tuple)):
+            for v in value:
+                walk(prefix, v)
+        elif isinstance(value, str) and re.search(r"<[^<>]+>", value):
+            found.append(prefix)
+
+    walk("", _secrets())
+    return found
+
+
 def sharepoint_config() -> dict | None:
     """Cấu hình SharePoint, hoặc ``None`` nếu chưa cấu hình (chế độ demo).
 

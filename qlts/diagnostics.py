@@ -9,7 +9,7 @@ import time
 import streamlit as st
 
 from . import schema, storage
-from .config import _secrets, auth_configured, parse_sharepoint_url, sharepoint_config
+from .config import _secrets, auth_configured, parse_sharepoint_url, placeholder_fields, sharepoint_config
 
 OK, WARN, FAIL = "✅", "⚠️", "❌"
 GRAPH_AUDIENCES = {"00000003-0000-0000-c000-000000000000", "https://graph.microsoft.com"}
@@ -28,6 +28,9 @@ def config_checks() -> list[tuple[str, str, str]]:
     sec = _secrets()
     sp, auth = sec.get("sharepoint", {}), sec.get("auth", {})
     out = []
+    pending = placeholder_fields()
+    if pending:
+        out.append((FAIL, "Giá trị mẫu <...> chưa thay", ", ".join(pending)))
     link = sp.get("list_url") or sp.get("site_url")
     if not sp:
         out.append((FAIL, "Mục [sharepoint] trong Secrets", "Chưa có. Streamlit → Manage app → Settings → Secrets, "
