@@ -45,3 +45,4 @@ if st.button("Tạo list còn thiếu", type="primary", icon=":material/build:")
     for line in log:
         st.write("•", line)
     st.success("Hoàn tất.")
+

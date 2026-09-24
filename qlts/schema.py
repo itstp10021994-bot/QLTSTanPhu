@@ -77,7 +77,7 @@ LISTS: dict[str, dict] = {
         "columns": {
             "Title": {"type": "text", "label": "Mã phòng", "sp": "Title"},
             "TenPhong": {"type": "text", "label": "Tên phòng"},
-            "KhuVuc": {"type": "text", "label": "Khu vực / Dãy"},
+            "KhuVuc": {"type": "text", "label": "Khu vực"},
             "NguoiQuanLy": {"type": "text", "label": "Email người quản lý"},
             "TenNguoiQuanLy": {"type": "text", "label": "Tên người quản lý"},
         },

@@ -7,7 +7,7 @@ Phiên bản Python (Streamlit) của app Power Apps **STP_Thietbi**. Dữ liệ
 
 | Nhóm | Chức năng | Ai thấy |
 |---|---|---|
-| Ban quản lý tài sản | Nhập mới thiết bị (tự sinh Mã chi tiết) · Chỉnh sửa thông tin thiết bị (sửa/xóa) · Điều chuyển nhiều thiết bị (có lịch sử) | Quản trị, Ban quản lý tài sản |
+| Ban quản lý tài sản | Danh sách thiết bị (sửa như bảng tính, thêm/xóa, nhập/xuất Excel) · Nhập mới thiết bị (tự sinh Mã chi tiết) · Chỉnh sửa thông tin thiết bị (sửa/xóa) · Điều chuyển nhiều thiết bị (có lịch sử) | Quản trị, Ban quản lý tài sản |
 | Ban kiểm kê | Kiểm kê theo đợt / phòng (tick có mặt, tình trạng), xem kết quả, lọc thiết bị không thấy, xuất Excel | Quản trị, Ban kiểm kê |
 | Người dùng | Danh sách Phòng đang quản lý · Kiểm kê phòng mình phụ trách | Mọi người đăng nhập |
 | Báo cáo | Báo cáo tổng quan BGH: số liệu, biểu đồ, tiến độ kiểm kê, thiết bị hỏng, xuất Excel | Quản trị, BGH, Ban quản lý tài sản |
@@ -27,7 +27,24 @@ Ngày hóa đơn, Nhóm thiết bị, Mail.
 - Trang **Phân quyền → Khởi tạo SharePoint → Kiểm tra** cho biết từng cột đã khớp chưa.
   Cột kiểu *Person/Lookup* chỉ đọc (app không ghi vào).
 
-**Các list app tự tạo** (nếu site chưa có) – dùng cột Title làm mã:
+**Tạo list bằng file Excel mẫu** (thư mục `templates/`, tạo lại bằng `python scripts/make_excel_templates.py`):
+
+| File | Tên list nên đặt |
+|---|---|
+| `1_ThietBi.xlsx` | `Data_Thietbichitiet` (hoặc tên khác, rồi dán link list vào `list_url`) |
+| `2_Phong.xlsx` | `Phong` |
+| `3_DieuChuyen.xlsx` | `DieuChuyen` |
+| `4_KiemKe.xlsx` | `KiemKe` |
+| `5_PhanQuyen.xlsx` | `PhanQuyen` |
+
+Microsoft Lists → **+ Danh sách mới → Từ Excel** → chọn file → chọn bảng `tbl_...` → chỉnh kiểu cột theo sheet
+*HuongDan* → đặt tên list như bảng trên → **Tạo** → xóa dòng mẫu. Tạo cả 5 list ở cùng một chỗ (cùng khu vực cá nhân
+hoặc cùng site). **Không đổi tên cột** – app dò cột theo đúng tên trong file. Nếu đặt tên list khác, khai báo trong
+`[sharepoint.lists]`.
+
+Hoặc để app tự tạo các list còn thiếu:
+
+**Các list phụ** (nếu site chưa có, trang *Khởi tạo SharePoint* tạo được) – cột đầu tiên là mã:
 
 | List | Title | Các cột |
 |---|---|---|

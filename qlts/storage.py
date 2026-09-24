@@ -43,7 +43,12 @@ def _tz() -> ZoneInfo:
 
 
 def _is_blank(value) -> bool:
-    return value is None or (isinstance(value, float) and pd.isna(value)) or value == ""
+    if value is None or (isinstance(value, str) and value == ""):
+        return True
+    try:
+        return bool(pd.isna(value))  # NaN, NaT, pd.NA
+    except (TypeError, ValueError):
+        return False
 
 
 def _as_date(value) -> date | None:
@@ -213,10 +218,22 @@ class SharePointStore:
             by_display.setdefault(_normalize(c.get("displayName", "")), c)
         overrides = self.column_map.get(list_name, {})
         resolved = {}
+        used: set[str] = set()
         for key, spec in schema.LISTS[list_name]["columns"].items():
-            candidates = [overrides.get(key), spec.get("sp"), key, spec["label"]]
-            for cand in filter(None, candidates):
-                col = by_name.get(cand) or by_display.get(_normalize(cand))
+            # Ưu tiên tên hiển thị (list tạo từ file Excel mẫu có cột "Mã phòng", "Email"... riêng,
+            # cột Title mặc định vẫn còn nhưng bỏ trống), sau đó mới tới tên nội bộ / Title.
+            candidates = [(overrides.get(key), "any"), (spec["label"], "display"), (key, "name"), (spec.get("sp"), "name")]
+            for cand, how in candidates:
+                if not cand:
+                    continue
+                if how == "display":
+                    col = by_display.get(_normalize(cand))
+                elif how == "name":
+                    col = by_name.get(cand)
+                else:
+                    col = by_name.get(cand) or by_display.get(_normalize(cand))
+                if col and col["name"] in used:
+                    col = None
                 if col:
                     kind = next((k for k in ("text", "number", "currency", "dateTime", "choice", "boolean",
                                              "personOrGroup", "lookup", "calculated") if k in col), "text")
@@ -225,6 +242,7 @@ class SharePointStore:
                         "kind": kind,
                         "readonly": bool(col.get("readOnly")) or kind in ("personOrGroup", "lookup", "calculated"),
                     }
+                    used.add(col["name"])
                     break
         self._columns[list_name] = resolved
         return resolved
@@ -277,14 +295,60 @@ class SharePointStore:
             url = data.get("@odata.nextLink")
         return rows
 
-    def create(self, list_name: str, fields: dict) -> str:
+    def _create_payload(self, list_name: str, fields: dict) -> dict:
         payload = self._to_sp(list_name, fields)
         cols = self.columns(list_name)
         if "Title" not in payload and not any(c["name"] == "Title" for c in cols.values()):
             # Cột Title bắt buộc mặc định nhưng không dùng trong app: điền mã để dễ tra cứu
             payload["Title"] = str(fields.get("MaChiTiet") or next((v for v in fields.values() if v), ""))[:255]
-        item = self._request("POST", f"{self._list_url(list_name)}/items", json={"fields": payload})
+        return payload
+
+    def create(self, list_name: str, fields: dict) -> str:
+        item = self._request("POST", f"{self._list_url(list_name)}/items",
+                             json={"fields": self._create_payload(list_name, fields)})
         return str(item["id"])
+
+    def batch(self, list_name: str, ops: list[tuple], progress=None) -> list[str]:
+        """Ghi nhiều thay đổi bằng Graph $batch (20 yêu cầu / lần).
+
+        ``ops``: ("create", fields) | ("update", id, fields) | ("delete", id).
+        Trả về danh sách lỗi (rỗng nếu thành công hết).
+        """
+        base = self._list_url(list_name)
+        requests_ = []
+        for i, op in enumerate(ops):
+            if op[0] == "create":
+                req = {"method": "POST", "url": f"{base}/items", "body": {"fields": self._create_payload(list_name, op[1])}}
+            elif op[0] == "update":
+                req = {"method": "PATCH", "url": f"{base}/items/{op[1]}/fields", "body": self._to_sp(list_name, op[2])}
+            else:
+                req = {"method": "DELETE", "url": f"{base}/items/{op[1]}"}
+            if "body" in req:
+                req["headers"] = {"Content-Type": "application/json"}
+            requests_.append({"id": str(i), **req})
+
+        errors: list[str] = []
+        pending = requests_
+        for attempt in range(4):
+            retry = []
+            for start in range(0, len(pending), 20):
+                chunk = pending[start:start + 20]
+                result = self._request("POST", "/$batch", json={"requests": chunk})
+                by_id = {r["id"]: r for r in chunk}
+                for resp in result.get("responses", []):
+                    status = resp.get("status", 500)
+                    if status in (429, 503) and attempt < 3:
+                        retry.append(by_id[resp["id"]])
+                    elif status >= 400:
+                        msg = (resp.get("body") or {}).get("error", {}).get("message", "")
+                        errors.append(f"Dòng {int(resp['id']) + 1}: lỗi {status} {msg}")
+                if progress:
+                    progress(min(1.0, (start + len(chunk)) / max(len(pending), 1)))
+            if not retry:
+                break
+            time.sleep(2 ** attempt)
+            pending = retry
+        return errors
 
     def update(self, list_name: str, item_id: str, fields: dict) -> None:
         payload = self._to_sp(list_name, fields)
@@ -319,6 +383,10 @@ class LocalStore:
         return data if not rows or "MaChiTiet" in rows[0] else {}
 
     def _read(self) -> dict:
+        if not self.path.exists():  # file demo bị xóa -> tạo lại dữ liệu mẫu
+            from .demo_data import build_demo_data
+
+            self._write(build_demo_data())
         return json.loads(self.path.read_text(encoding="utf-8"))
 
     def _write(self, data: dict) -> None:
@@ -350,6 +418,18 @@ class LocalStore:
             data = self._read()
             data[list_name] = [r for r in data.get(list_name, []) if r["id"] != str(item_id)]
             self._write(data)
+
+    def batch(self, list_name: str, ops: list[tuple], progress=None) -> list[str]:
+        for i, op in enumerate(ops):
+            if op[0] == "create":
+                self.create(list_name, op[1])
+            elif op[0] == "update":
+                self.update(list_name, op[1], op[2])
+            else:
+                self.delete(list_name, op[1])
+            if progress:
+                progress((i + 1) / len(ops))
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -449,5 +529,15 @@ def update(list_name: str, item_id: str, fields: dict) -> None:
 def delete(list_name: str, item_id: str) -> None:
     try:
         get_store().delete(list_name, item_id)
+    finally:
+        refresh()
+
+
+def batch(list_name: str, ops: list[tuple], progress=None) -> list[str]:
+    """Ghi nhiều thay đổi một lần; trả về danh sách lỗi."""
+    if not ops:
+        return []
+    try:
+        return get_store().batch(list_name, ops, progress)
     finally:
         refresh()

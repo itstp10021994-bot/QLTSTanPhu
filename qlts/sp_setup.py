@@ -90,3 +90,4 @@ def ensure_lists(store: SharePointStore, add_columns_to: set[str] | None = None)
 
 
 __all__ = ["column_report", "ensure_lists", "StorageError"]
+

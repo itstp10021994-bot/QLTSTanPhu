@@ -39,6 +39,7 @@ sections: dict[str, list[st.Page]] = {"": [home]}
 
 if user.has_any(ROLE_QLTS):
     sections["Ban quản lý tài sản"] = [
+        page("danh_sach_tb.py", "Danh sách thiết bị", ":material/table_view:"),
         page("nhap_moi.py", "Nhập mới thiết bị", ":material/edit_square:"),
         page("chinh_sua.py", "Chỉnh sửa thông tin thiết bị", ":material/settings:"),
         page("dieu_chuyen.py", "Điều chuyển thiết bị", ":material/swap_horiz:"),
