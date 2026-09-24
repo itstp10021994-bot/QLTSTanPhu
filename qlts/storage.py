@@ -632,8 +632,20 @@ def _user_token() -> str:
     return token
 
 
-@st.cache_resource
+def _config_fingerprint() -> str:
+    """Dấu vân tay của cấu hình kết nối: đổi Secrets -> tạo kết nối / bộ nhớ đệm mới."""
+    import hashlib
+
+    raw = json.dumps(sharepoint_config() or {}, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
 def get_store():
+    return _get_store(_config_fingerprint())
+
+
+@st.cache_resource(max_entries=4)
+def _get_store(fingerprint: str):  # noqa: ARG001 - khóa cache theo cấu hình
     cfg = sharepoint_config()
     if not cfg:
         return LocalStore(LOCAL_DB)
@@ -653,11 +665,12 @@ def is_bridge() -> bool:
 
 
 def _cache_scope() -> str:
-    """Chế độ delegated: mỗi người dùng một bộ nhớ đệm riêng (theo quyền của họ)."""
+    """Khóa bộ nhớ đệm: theo cấu hình kết nối, và theo người dùng ở chế độ delegated."""
+    scope = _config_fingerprint()
     cfg = sharepoint_config()
     if cfg and cfg["mode"] == "delegated" and st.user.is_logged_in:
-        return str(st.user.get("email") or st.user.get("preferred_username") or "")
-    return ""
+        scope += "|" + str(st.user.get("email") or st.user.get("preferred_username") or "")
+    return scope
 
 
 def empty_frame(list_name: str) -> pd.DataFrame:
