@@ -55,10 +55,53 @@ def placeholder_fields() -> list[str]:
 
 def bridge_config() -> dict | None:
     """Cấu hình cầu nối Power Automate (mục [powerautomate]: flow_url, key)."""
-    pa = dict(_secrets().get("powerautomate", {}))
-    if pa.get("flow_url") and pa.get("key") and not placeholder_in(pa):
-        return pa
+    pa = dict(_powerautomate_section() or {})
+    if pa.get("flow_url") and pa.get("key") and not placeholder_in(pa) and _valid_flow_url(str(pa["flow_url"])):
+        return {**pa, "flow_url": str(pa["flow_url"]).strip(), "key": str(pa["key"]).strip()}
     return None
+
+
+def _valid_flow_url(url: str) -> bool:
+    url = url.strip()
+    return url.startswith("https://") or url.startswith(("http://127.0.0.1", "http://localhost"))
+
+
+def _powerautomate_section():
+    """Mục [powerautomate] trong Secrets (không phân biệt hoa/thường)."""
+    return next((v for k, v in _secrets().items() if k.lower().replace(" ", "") == "powerautomate"), None)
+
+
+def bridge_problem() -> str | None:
+    """Mô tả cụ thể lỗi của mục [powerautomate] (không hiện giá trị bí mật)."""
+    sec = _secrets()
+    pa = _powerautomate_section()
+    if pa is None:
+        near = [k for k in sec if "power" in k.lower() or "automate" in k.lower() or k.lower() == "flow"]
+        if near:
+            return f"tên mục phải là `[powerautomate]` – đang là `[{near[0]}]`"
+        return None
+    if not isinstance(pa, dict):
+        return "`[powerautomate]` phải là một mục (dòng tiêu đề trong ngoặc vuông), bên dưới là flow_url và key."
+    problems = []
+    keys = {k.lower(): k for k in pa}
+    url = str(pa.get("flow_url", "")).strip()
+    key = str(pa.get("key", "")).strip()
+    if not url:
+        other = [keys[k] for k in keys if "url" in k and k != "flow_url"]
+        problems.append("thiếu `flow_url`" + (f" (đang ghi là `{other[0]}` – đổi thành `flow_url`)" if other else ""))
+    elif placeholder_in(url):
+        problems.append("`flow_url` còn chữ mẫu `<...>` – dán HTTP URL thật của flow")
+    elif not _valid_flow_url(url):
+        problems.append("`flow_url` phải bắt đầu bằng `https://` (copy nguyên HTTP URL ở trigger của flow)")
+    if not key:
+        other = [keys[k] for k in keys if k not in ("flow_url",)]
+        problems.append("thiếu `key`" + (f" (các dòng đang có: {', '.join(other)})" if other else ""))
+    elif placeholder_in(key):
+        problems.append("`key` còn chữ mẫu `<...>` – thay bằng mã bí mật bạn đặt trong bước Kiem tra của flow")
+    extra = [k for k in pa if k not in ("flow_url", "key")]
+    if problems and extra:
+        problems.append(f"dòng không dùng: {', '.join(extra)}")
+    return "; ".join(problems) or None
 
 
 def placeholder_in(value) -> bool:
@@ -118,10 +161,8 @@ def sharepoint_config() -> dict | None:
 def sharepoint_config_problem() -> str | None:
     """Lý do mục [sharepoint] đã khai báo nhưng chưa dùng được (để báo cho người dùng)."""
     sp = _secrets().get("sharepoint")
-    pa = _secrets().get("powerautomate")
-    if pa and not bridge_config():
-        return ("Mục [powerautomate] chưa đủ: cần `flow_url` (URL của bước “When a HTTP request is received”) "
-                "và `key` (mã bí mật trùng với flow).")
+    if not bridge_config() and bridge_problem():
+        return f"Mục [powerautomate] chưa đúng: {bridge_problem()}."
     if not sp or sharepoint_config():
         return None
     link = sp.get("list_url") or sp.get("site_url")

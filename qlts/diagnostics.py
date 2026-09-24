@@ -9,8 +9,8 @@ import time
 import streamlit as st
 
 from . import schema, storage
-from .config import (_secrets, auth_configured, bridge_config, parse_sharepoint_url, placeholder_fields,
-                     sharepoint_config)
+from .config import (_secrets, auth_configured, bridge_config, bridge_problem, parse_sharepoint_url,
+                     placeholder_fields, sharepoint_config)
 
 OK, WARN, FAIL = "✅", "⚠️", "❌"
 GRAPH_AUDIENCES = {"00000003-0000-0000-c000-000000000000", "https://graph.microsoft.com"}
@@ -32,13 +32,16 @@ def config_checks() -> list[tuple[str, str, str]]:
     pending = placeholder_fields()
     if pending:
         out.append((FAIL, "Giá trị mẫu <...> chưa thay", ", ".join(pending)))
-    pa = sec.get("powerautomate")
+    pa = next((v for k, v in sec.items() if k.lower().replace(" ", "") == "powerautomate"), None)
+    if pa is None and bridge_problem():
+        out.append((FAIL, "Mục [powerautomate]", bridge_problem()))
+        return out
     if pa:
         if bridge_config():
             out.append((OK, "Mục [powerautomate]", "Có flow_url và key → đọc/ghi SharePoint qua flow Power Automate."))
             out.append((OK, "Đăng nhập", "Bằng mã 6 số gửi qua email (flow gửi mail)."))
         else:
-            out.append((FAIL, "Mục [powerautomate]", "Thiếu `flow_url` hoặc `key` (hoặc còn giá trị mẫu <...>)."))
+            out.append((FAIL, "Mục [powerautomate]", bridge_problem() or "Thiếu `flow_url` hoặc `key`."))
         return out
     link = sp.get("list_url") or sp.get("site_url")
     if not sp:
