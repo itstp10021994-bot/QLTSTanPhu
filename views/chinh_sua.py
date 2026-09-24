@@ -60,8 +60,10 @@ with st.form(f"edit_{item.id}"):
     noi = c1.selectbox("Nơi sử dụng", room_opts, index=idx(room_opts, item.NoiSuDung),
                        format_func=lambda r: labels.get(r, r), accept_new_options=True,
                        help="Muốn lưu lịch sử di chuyển, hãy dùng chức năng Điều chuyển.")
-    nguoi_sd = c2.text_input("Người sử dụng", item.NguoiSuDung)
-    ql_phong = c3.text_input("Quản lý phòng", item.QuanLyPhong)
+    nguoi_sd = ui.user_picker(c2, "Người sử dụng", default=item.NguoiSuDung, key=f"cs_nsd_{item.id}",
+                              blank="(Để trống)")
+    ql_phong = ui.user_picker(c3, "Quản lý phòng", default=item.QuanLyPhong, key=f"cs_qlp_{item.id}",
+                              blank="(Để trống)")
     c1, c2, c3, c4 = st.columns(4)
     gia_tri = c1.number_input("Giá trị (VNĐ)", min_value=0, value=int(item.GiaTri), step=100_000)
     ngay_mua = c2.date_input("Ngày mua", value=as_date(item.NgayMua), format="DD/MM/YYYY")

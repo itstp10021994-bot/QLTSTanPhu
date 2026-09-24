@@ -29,7 +29,7 @@ else:
         c1, c2, c3 = st.columns(3)
         dest_opts = [r for r in rooms if r != tu_phong] + [schema.NOI_THANH_LY]
         den_phong = c1.selectbox("Đến nơi sử dụng", dest_opts, format_func=fmt, accept_new_options=True)
-        nguoi_sd = c2.text_input("Người sử dụng mới (email)", help="Để trống = người quản lý phòng nhận.")
+        nguoi_sd = ui.user_picker(c2, "Người sử dụng mới", key="dc_nsd", blank="(Người quản lý phòng nhận)")
         ngay = c3.date_input("Ngày điều chuyển", value=date.today(), format="DD/MM/YYYY")
         ly_do = st.text_area("Lý do", height=68)
         ok = st.form_submit_button(f"Điều chuyển {len(chosen)} thiết bị", type="primary",

@@ -445,6 +445,11 @@ class BridgeStore(SharePointStore):
     def rest(self, method: str, uri: str, body: dict | None = None):
         return self._call({"action": "sp", "method": method, "uri": uri, "body": body or {}})
 
+    def site_users(self) -> list[dict]:
+        """Người dùng của site SharePoint (email + họ tên)."""
+        data = self.rest("GET", "_api/web/siteusers?$select=Title,Email,PrincipalType&$filter=PrincipalType eq 1")
+        return [{"email": u.get("Email", ""), "name": u.get("Title", "")} for u in data.get("value", [])]
+
     def send_mail(self, to: str, subject: str, html: str) -> None:
         self._call({"action": "mail", "to": to, "subject": subject, "html": html})
 

@@ -33,7 +33,7 @@ SAMPLES = {
         "NhomThietBi": "Nhóm Công Nghệ Thông Tin", "Mail": "",
     },
     schema.PHONG: {
-        "Title": "Trệt_PH001", "TenPhong": "Phòng học 001", "KhuVuc": "Tầng trệt",
+        "Title": "Trệt_PH001", "TenPhong": "Phòng học 001",
         "NguoiQuanLy": "giaovien@truong.edu.vn", "TenNguoiQuanLy": "Nguyễn Văn A",
     },
     schema.DIEU_CHUYEN: {

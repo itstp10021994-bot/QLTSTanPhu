@@ -17,15 +17,15 @@ def build_demo_data() -> dict:
          "ChucDanh": "Phó Hiệu trưởng"},
     ]
     phong = [
-        {"Title": "L1_PH103", "TenPhong": "Phòng học 103", "KhuVuc": "Lầu 1",
+        {"Title": "L1_PH103", "TenPhong": "Phòng học 103",
          "NguoiQuanLy": "gv1@demo.local", "TenNguoiQuanLy": "Phạm Thị Mai"},
-        {"Title": "L1_PH104", "TenPhong": "Phòng học 104", "KhuVuc": "Lầu 1",
+        {"Title": "L1_PH104", "TenPhong": "Phòng học 104",
          "NguoiQuanLy": "gv1@demo.local", "TenNguoiQuanLy": "Phạm Thị Mai"},
-        {"Title": "Trệt_PH001", "TenPhong": "Phòng học 001", "KhuVuc": "Tầng trệt",
+        {"Title": "Trệt_PH001", "TenPhong": "Phòng học 001",
          "NguoiQuanLy": "gv2@demo.local", "TenNguoiQuanLy": "Hoàng Minh Tuấn"},
-        {"Title": "Trệt_HOA", "TenPhong": "Phòng thí nghiệm Hóa", "KhuVuc": "Tầng trệt",
+        {"Title": "Trệt_HOA", "TenPhong": "Phòng thí nghiệm Hóa",
          "NguoiQuanLy": "gv2@demo.local", "TenNguoiQuanLy": "Hoàng Minh Tuấn"},
-        {"Title": "Kho_TB", "TenPhong": "Kho thiết bị", "KhuVuc": "Tầng trệt",
+        {"Title": "Kho_TB", "TenPhong": "Kho thiết bị",
          "NguoiQuanLy": "qlts@demo.local", "TenNguoiQuanLy": "Nguyễn Văn Tài"},
     ]
     managers = {p["Title"]: p["NguoiQuanLy"] for p in phong}

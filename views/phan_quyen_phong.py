@@ -37,13 +37,12 @@ if missing:
 
 with st.form("add_room", clear_on_submit=True):
     st.markdown("**Thêm phòng mới**")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     code = c1.text_input("Mã phòng (Nơi sử dụng) *", placeholder="VD: L1_PH103")
     name = c2.text_input("Tên phòng")
-    khu = c3.text_input("Khu vực / Dãy")
     c1, c2 = st.columns(2)
-    email = c1.text_input("Email người quản lý")
-    ten = c2.text_input("Tên người quản lý")
+    email = ui.user_picker(c1, "Người quản lý phòng", key="add_room_ql", blank="(Chưa có)")
+    ten = c2.text_input("Tên người quản lý", help="Để trống sẽ lấy họ tên theo danh sách người dùng.")
     if st.form_submit_button("Thêm phòng", type="primary", icon=":material/add:"):
         code = code.strip()
         if not code:
@@ -51,7 +50,8 @@ with st.form("add_room", clear_on_submit=True):
         elif (phong["Title"].str.lower() == code.lower()).any():
             st.error(f"Phòng {code} đã có trong danh mục.")
         else:
-            storage.create(schema.PHONG, {"Title": code, "TenPhong": name.strip() or code, "KhuVuc": khu,
+            ten = ten.strip() or thietbi.user_directory().get(email, "")
+            storage.create(schema.PHONG, {"Title": code, "TenPhong": name.strip() or code,
                                           "NguoiQuanLy": email.strip().lower(), "TenNguoiQuanLy": ten})
             n = sync_items(code, email.strip().lower()) if email.strip() else 0
             ui.flash(f"Đã thêm phòng {code}" + (f", cập nhật {n} thiết bị." if n else "."))
@@ -59,13 +59,13 @@ with st.form("add_room", clear_on_submit=True):
 
 st.markdown("##### Danh mục phòng")
 st.caption("Sửa trực tiếp trong bảng rồi bấm Lưu. Chỉ xóa được phòng không còn thiết bị.")
-view = phong[["id", "Title", "TenPhong", "KhuVuc", "NguoiQuanLy", "TenNguoiQuanLy"]].copy()
+view = phong[["id", "Title", "TenPhong", "NguoiQuanLy", "TenNguoiQuanLy"]].copy()
 view["SoTB"] = view["Title"].map(tb.groupby("NoiSuDung").size()).fillna(0).astype(int)
 view["Xoa"] = False
 edited = st.data_editor(
     view, hide_index=True, width="stretch", key="phong_editor", disabled=["id", "Title", "SoTB"],
     column_config={
-        "id": None, "Title": "Mã phòng", "TenPhong": "Tên phòng", "KhuVuc": "Khu vực",
+        "id": None, "Title": "Mã phòng", "TenPhong": "Tên phòng",
         "NguoiQuanLy": "Email người quản lý", "TenNguoiQuanLy": "Tên người quản lý",
         "SoTB": "Số thiết bị", "Xoa": st.column_config.CheckboxColumn("Xóa"),
     },
@@ -84,7 +84,7 @@ if st.button("Lưu thay đổi", icon=":material/save:"):
                 continue
             old = original.loc[row.id]
             fields = {}
-            for k in ("TenPhong", "KhuVuc", "NguoiQuanLy", "TenNguoiQuanLy"):
+            for k in ("TenPhong", "NguoiQuanLy", "TenNguoiQuanLy"):
                 val = (getattr(row, k) or "").strip()
                 if k == "NguoiQuanLy":
                     val = val.lower()

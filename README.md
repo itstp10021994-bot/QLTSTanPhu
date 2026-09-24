@@ -49,7 +49,7 @@ Hoặc để app tự tạo các list còn thiếu:
 
 | List | Title | Các cột |
 |---|---|---|
-| `Phong` | Mã phòng (= Nơi sử dụng) | TenPhong, KhuVuc, NguoiQuanLy (email), TenNguoiQuanLy |
+| `Phong` | Mã phòng (= Nơi sử dụng) | TenPhong, NguoiQuanLy (email), TenNguoiQuanLy |
 | `DieuChuyen` | Mã chi tiết | TenThietBi, TuPhong, DenPhong, SoLuong, NgayDieuChuyen, NguoiThucHien, LyDo |
 | `Data_Thietbi` (kiểm kê) | – | Mã số tài sản, STT, Tên tài sản, Đặc điểm, ĐVT, Số lượng, Số lượng kiểm kê, Ghi chú, Quản lý thiết bị, Nơi sử dụng, Quản lý phòng, Trạng thái, Ngày kiểm kê, Trạng thái kiểm kê, Ngày xác nhận, Trạng thái xác nhận, Đợt kiểm kê (+ Người kiểm kê, Người xác nhận nếu có) |
 | `PhanQuyen` | Email | HoTen, VaiTro (Quản trị hệ thống / Ban quản lý tài sản / Ban kiểm kê / Ban giám hiệu), ChucDanh |

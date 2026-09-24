@@ -88,7 +88,7 @@ def room_label_map() -> dict[str, str]:
     from . import thietbi
 
     phong = storage.load(schema.PHONG).set_index("Title")["TenPhong"].to_dict()
-    return {r: f"{r} - {phong[r]}" if phong.get(r) else r for r in thietbi.all_rooms()}
+    return {r: f"{r} - {phong[r]}" if phong.get(r) and phong[r].strip() != r else r for r in thietbi.all_rooms()}
 
 
 def to_excel(sheets: dict[str, pd.DataFrame]) -> bytes:
@@ -136,3 +136,31 @@ def show_flash() -> None:
     msg = st.session_state.pop("_flash", None)
     if msg:
         st.success(msg)
+
+
+def user_picker(container, label: str, default: str = "", key: str | None = None, blank: str | None = None,
+                help: str | None = None) -> str:
+    """Ô chọn người dùng trong trường (gõ để tìm, hoặc nhập email mới). Trả về email (chữ thường)."""
+    from . import thietbi
+
+    users = thietbi.user_directory()
+    default = (default or "").strip()
+    if "@" in default:
+        default = default.lower()  # email: không phân biệt hoa/thường; họ tên thì giữ nguyên
+    options = list(users)
+    if default and default not in users:
+        options.insert(0, default)
+    if blank is not None:
+        options.insert(0, "")
+    names = {**users}
+
+    def fmt(email: str) -> str:
+        if not email:
+            return blank or ""
+        return f"{names[email]} – {email}" if names.get(email) else email
+
+    index = options.index(default) if default in options else (0 if blank is not None else None)
+    value = container.selectbox(label, options, index=index, format_func=fmt, key=key, help=help,
+                                accept_new_options=True, placeholder="Gõ tên hoặc email để tìm...")
+    value = (value or "").strip()
+    return value.lower() if "@" in value else value

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 import pandas as pd
+import streamlit as st
 
 from . import schema, storage
 
@@ -140,3 +141,51 @@ def catalog_fill(fields: dict, catalog: pd.DataFrame) -> dict:
         if not str(fields.get("NhomThietBi") or "").strip():
             fields["NhomThietBi"] = row["NhomThietBi"]
     return fields
+
+
+# ---------------------------------------------------------------------------
+# Người dùng trong trường
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=600, show_spinner=False)
+def _site_users(scope: str) -> list[dict]:  # noqa: ARG001 - khóa cache theo cấu hình
+    store = storage.get_store()
+    if not hasattr(store, "site_users"):
+        return []
+    try:
+        return store.site_users()
+    except storage.StorageError:
+        return []
+
+
+def user_directory() -> dict[str, str]:
+    """email -> họ tên: người dùng site SharePoint + Phân quyền + quản lý phòng + người sử dụng thiết bị."""
+    users: dict[str, str] = {}
+
+    def add(email, name=""):
+        email = str(email or "").strip().lower()
+        if "@" in email and " " not in email:
+            if name and not users.get(email):
+                users[email] = str(name).strip()
+            else:
+                users.setdefault(email, "")
+
+    for u in _site_users(storage._cache_scope()):
+        add(u["email"], u["name"])
+    for r in storage.load(schema.PHAN_QUYEN).itertuples():
+        add(r.Title, r.HoTen)
+    for r in storage.load(schema.PHONG).itertuples():
+        add(r.NguoiQuanLy, r.TenNguoiQuanLy)
+    tb = storage.load(schema.THIET_BI)
+    for col in ("NguoiSuDung", "QuanLyPhong"):
+        for email in tb[col].unique():
+            add(email)
+    return dict(sorted(users.items(), key=lambda kv: (kv[1] or kv[0]).lower()))
+
+
+def suggest_user(room: str) -> str:
+    """Gợi ý người sử dụng cho một phòng: người dùng phổ biến nhất trong phòng, nếu không có thì người quản lý phòng."""
+    tb = storage.load(schema.THIET_BI)
+    used = tb[(tb["NoiSuDung"] == room) & tb["NguoiSuDung"].str.contains("@", regex=False)]["NguoiSuDung"]
+    if not used.empty:
+        return used.str.strip().str.lower().mode().iloc[0]
+    return room_managers().get(room, "")

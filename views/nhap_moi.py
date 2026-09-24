@@ -61,6 +61,21 @@ def idx(options: list, value, default=0):
     return options.index(value) if value in options else default
 
 
+# ---- Nơi sử dụng -> gợi ý Người sử dụng (ngoài form để cập nhật ngay khi đổi phòng) ----
+c1, c2 = st.columns(2)
+noi = c1.selectbox("Nơi sử dụng *", rooms, index=None, format_func=lambda r: labels.get(r, r),
+                   accept_new_options=True, placeholder="Chọn hoặc gõ nơi sử dụng", key="nm_noi")
+noi = (noi or "").strip()
+goi_y = thietbi.suggest_user(noi) if noi else ""
+nguoi_sd = ui.user_picker(
+    c2, "Người sử dụng", default=goi_y, key=f"nm_nsd_{noi}", blank="(Để trống)",
+    help="Tự gợi ý theo nơi sử dụng (người đang dùng thiết bị trong phòng / người quản lý phòng). "
+         "Gõ tên hoặc email để chọn người khác trong trường.",
+)
+if noi and managers.get(noi):
+    c1.caption(f"Quản lý phòng: {managers[noi]}")
+
+
 with st.form(f"nhap_moi_{ma}", clear_on_submit=False):
     c1, c2, c3 = st.columns(3)
     ten = c1.text_input("Tên thiết bị *", tv("TenThietBi"))
@@ -72,12 +87,9 @@ with st.form(f"nhap_moi_{ma}", clear_on_submit=False):
     nhom = c3.selectbox("Nhóm thiết bị", nhom_opts, index=idx(nhom_opts, tv("NhomThietBi")),
                         accept_new_options=True)
     dac_diem = st.text_input("Đặc điểm", tv("DacDiem"), placeholder="Hãng, cấu hình, model...")
-    c1, c2, c3 = st.columns(3)
-    noi = c1.selectbox("Nơi sử dụng *", rooms, format_func=lambda r: labels.get(r, r), accept_new_options=True)
-    nguoi_sd = c2.text_input("Người sử dụng (email)", help="Để trống sẽ lấy người quản lý phòng.")
+    c1, c2, c3, c4, c5 = st.columns(5)
     tinh_trang_opts = thietbi.status_options(tb)
-    tinh_trang = c3.selectbox("Tình trạng", tinh_trang_opts, index=idx(tinh_trang_opts, "Mới"))
-    c1, c2, c3, c4 = st.columns(4)
+    tinh_trang = c5.selectbox("Tình trạng", tinh_trang_opts, index=idx(tinh_trang_opts, "Mới"))
     dvt_opts = thietbi.distinct(tb, "DVT", schema.DON_VI_TINH)
     dvt = c1.selectbox("ĐVT", dvt_opts, index=idx(dvt_opts, tv("DVT", "Cái")), accept_new_options=True)
     gia_tri = c2.number_input("Giá trị / thiết bị (VNĐ)", min_value=0, value=int(tv("GiaTri", 0)), step=100_000)
@@ -94,7 +106,6 @@ with st.form(f"nhap_moi_{ma}", clear_on_submit=False):
     submitted = st.form_submit_button(f"Lưu {so_luong} thiết bị", type="primary", icon=":material/save:")
 
 if submitted:
-    noi = (noi or "").strip()
     if not ma or not ten.strip() or not noi:
         st.error("Vui lòng nhập Mã tài sản, Tên thiết bị và Nơi sử dụng.")
         st.stop()
@@ -109,7 +120,7 @@ if submitted:
                 "MaChiTiet": code, "MaTaiSan": ma, "STT": stt + i + 1,
                 "TenThietBi": ten.strip(), "ChiTiet": chi_tiet.strip() or ten.strip(), "DacDiem": dac_diem,
                 "TenPhongBan": serial_lines[i] if i < len(serial_lines) else "",
-                "DVT": dvt, "NoiSuDung": noi, "NguoiSuDung": nguoi_sd.strip().lower() or quan_ly_phong,
+                "DVT": dvt, "NoiSuDung": noi, "NguoiSuDung": nguoi_sd or quan_ly_phong,
                 "QuanLyPhong": quan_ly_phong, "QuanLyThietBi": user.name, "TinhTrang": tinh_trang,
                 "NgayMua": ngay_mua, "NgayHoaDon": ngay_hd, "GiaTri": gia_tri, "MaSAP": ma_sap,
                 "ThoiHanBaoHanh": bao_hanh, "NhomThietBi": nhom, "GhiChu": ghi_chu,
