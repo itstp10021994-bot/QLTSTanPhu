@@ -61,14 +61,20 @@ if not dots:
 else:
     dot = st.selectbox("Đợt kiểm kê", dots)
     cur = kk[kk["DotKiemKe"] == dot]
-    done = cur["MaPhong"].nunique()
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Phòng đã kiểm kê", f"{done}/{len(rooms)}", border=True)
-    k2.metric("Thiết bị đã kiểm", len(cur), border=True)
-    k3.metric("Không tìm thấy", int((cur["SoLuongThucTe"] == 0).sum()), border=True)
-    pending = [r for r in rooms if r not in set(cur["MaPhong"])]
+    done_rooms = set(cur[cur["TrangThaiKiemKe"] == schema.DA_KIEM_KE]["NoiSuDung"])
+    confirmed = set(cur[cur["TrangThaiXacNhan"] == schema.DA_XAC_NHAN]["NoiSuDung"])
+    diff = cur["SoLuongKiemKe"] - cur["SoLuong"]
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Phòng đã kiểm kê", f"{len(done_rooms & set(rooms))}/{len(rooms)}", border=True)
+    k2.metric("Phòng đã xác nhận", len(confirmed & set(rooms)), border=True)
+    k3.metric("Thiết bị thiếu", int(-diff[diff < 0].sum()), border=True)
+    k4.metric("Thiết bị thừa", int(diff[diff > 0].sum()), border=True)
+    pending = [r for r in rooms if r not in done_rooms]
     if pending:
         st.caption("Chưa kiểm kê: " + ", ".join(labels.get(r, r) for r in pending))
+    disagree = sorted(set(cur[cur["TrangThaiXacNhan"] == schema.KHONG_DONG_Y]["NoiSuDung"]))
+    if disagree:
+        st.warning("Quản lý phòng không đồng ý: " + ", ".join(labels.get(r, r) for r in disagree))
     kk_view = cur.drop(columns="id").rename(columns=schema.labels_of(schema.KIEM_KE))
 
 st.markdown("##### Thiết bị cần kiểm tra / sửa chữa / thanh lý")

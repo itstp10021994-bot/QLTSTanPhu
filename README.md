@@ -8,8 +8,8 @@ Phiên bản Python (Streamlit) của app Power Apps **STP_Thietbi**. Dữ liệ
 | Nhóm | Chức năng | Ai thấy |
 |---|---|---|
 | Ban quản lý tài sản | Danh sách thiết bị (sửa như bảng tính, thêm/xóa, nhập/xuất Excel) · Nhập mới thiết bị (tự sinh Mã chi tiết) · Chỉnh sửa thông tin thiết bị (sửa/xóa) · Điều chuyển nhiều thiết bị (có lịch sử) | Quản trị, Ban quản lý tài sản |
-| Ban kiểm kê | Kiểm kê theo đợt / phòng (tick có mặt, tình trạng), xem kết quả, lọc thiết bị không thấy, xuất Excel | Quản trị, Ban kiểm kê |
-| Người dùng | Danh sách Phòng đang quản lý · Kiểm kê phòng mình phụ trách | Mọi người đăng nhập |
+| Ban kiểm kê | Kiểm kê theo đợt / nơi sử dụng: gộp thiết bị cùng Mã tài sản + Đặc điểm + Nơi sử dụng, nhập Số lượng kiểm kê → **Xác nhận kiểm kê**; xem kết quả, xuất Excel | Quản trị, Ban kiểm kê |
+| Người dùng | Danh sách Phòng đang quản lý · Kiểm kê: quản lý phòng **xác nhận** (đồng ý / không đồng ý) kết quả của Ban kiểm kê | Mọi người đăng nhập |
 | Báo cáo | Báo cáo tổng quan BGH: số liệu, biểu đồ, tiến độ kiểm kê, thiết bị hỏng, xuất Excel | Quản trị, BGH, Ban quản lý tài sản |
 | Phân quyền | Phân quyền admin (vai trò) · Phân quyền quản lý phòng (danh mục phòng + người phụ trách) · Khởi tạo SharePoint | Quản trị |
 
@@ -34,7 +34,7 @@ Ngày hóa đơn, Nhóm thiết bị, Mail.
 | `1_ThietBi.xlsx` | `Data_Thietbichitiet` (hoặc tên khác, rồi dán link list vào `list_url`) |
 | `2_Phong.xlsx` | `Phong` |
 | `3_DieuChuyen.xlsx` | `DieuChuyen` |
-| `4_KiemKe.xlsx` | `KiemKe` |
+| `4_KiemKe.xlsx` | `Data_Thietbi` (list kiểm kê dạng gộp) |
 | `5_PhanQuyen.xlsx` | `PhanQuyen` |
 
 Microsoft Lists → **+ Danh sách mới → Từ Excel** → chọn file → chọn bảng `tbl_...` → chỉnh kiểu cột theo sheet
@@ -50,7 +50,7 @@ Hoặc để app tự tạo các list còn thiếu:
 |---|---|---|
 | `Phong` | Mã phòng (= Nơi sử dụng) | TenPhong, KhuVuc, NguoiQuanLy (email), TenNguoiQuanLy |
 | `DieuChuyen` | Mã chi tiết | TenThietBi, TuPhong, DenPhong, SoLuong, NgayDieuChuyen, NguoiThucHien, LyDo |
-| `KiemKe` | Mã chi tiết | TenThietBi, MaPhong, DotKiemKe, SoLuongSoSach, SoLuongThucTe (1 = có mặt, 0 = không thấy), TinhTrang, NguoiKiemKe, NgayKiemKe, GhiChu |
+| `Data_Thietbi` (kiểm kê) | – | Mã số tài sản, STT, Tên tài sản, Đặc điểm, ĐVT, Số lượng, Số lượng kiểm kê, Ghi chú, Quản lý thiết bị, Nơi sử dụng, Quản lý phòng, Trạng thái, Ngày kiểm kê, Trạng thái kiểm kê, Ngày xác nhận, Trạng thái xác nhận, Đợt kiểm kê (+ Người kiểm kê, Người xác nhận nếu có) |
 | `PhanQuyen` | Email | HoTen, VaiTro (Quản trị hệ thống / Ban quản lý tài sản / Ban kiểm kê / Ban giám hiệu), ChucDanh |
 
 **Tên list/cột khác mặc định?** Khai báo trong secrets, không cần sửa code:

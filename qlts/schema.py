@@ -17,7 +17,11 @@ ROLES = [ROLE_ADMIN, ROLE_QLTS, ROLE_KIEMKE, ROLE_BGH]
 TINH_TRANG = ["Mới", "Bình thường", "Cần kiểm tra", "Cần sửa chữa", "Cần thanh lý", "Đã thanh lý", "Mất"]
 TINH_TRANG_TOT = {"Mới", "Bình thường", "Tốt"}
 TINH_TRANG_DA_THANH_LY = {"Đã thanh lý"}
-NOI_THANH_LY = "Thanh lý"  # "Nơi sử dụng" của thiết bị đã đưa đi thanh lý
+NOI_THANH_LY = "Thanh lý"
+DA_KIEM_KE = "Đã kiểm kê"
+DANG_KIEM_KE = "Đang kiểm kê"
+DA_XAC_NHAN = "Đã xác nhận"
+KHONG_DONG_Y = "Không đồng ý"  # "Nơi sử dụng" của thiết bị đã đưa đi thanh lý
 NHOM_THIET_BI = [
     "Nhóm Công Nghệ Thông Tin",
     "Nhóm Thiết bị dạy học",
@@ -95,19 +99,31 @@ LISTS: dict[str, dict] = {
             "LyDo": {"type": "note", "label": "Lý do"},
         },
     },
+    # List kiểm kê dạng gộp (giống "Data_Thietbi"): mỗi dòng = một nhóm thiết bị cùng
+    # Mã tài sản + Đặc điểm + Nơi sử dụng trong một đợt kiểm kê.
     KIEM_KE: {
-        "sp_list": "KiemKe",
+        "sp_list": "Data_Thietbi",
         "columns": {
-            "Title": {"type": "text", "label": "Mã chi tiết", "sp": "Title"},
-            "TenThietBi": {"type": "text", "label": "Tên thiết bị"},
-            "MaPhong": {"type": "text", "label": "Phòng"},
-            "DotKiemKe": {"type": "text", "label": "Đợt kiểm kê"},
-            "SoLuongSoSach": {"type": "number", "label": "SL sổ sách"},
-            "SoLuongThucTe": {"type": "number", "label": "SL thực tế"},
-            "TinhTrang": {"type": "text", "label": "Tình trạng"},
-            "NguoiKiemKe": {"type": "text", "label": "Người kiểm kê"},
-            "NgayKiemKe": {"type": "date", "label": "Ngày kiểm kê"},
+            "MaTaiSan": {"type": "text", "label": "Mã số tài sản"},
+            "STT": {"type": "number", "label": "STT"},
+            "TenTaiSan": {"type": "text", "label": "Tên tài sản"},
+            "DacDiem": {"type": "note", "label": "Đặc điểm"},
+            "DVT": {"type": "text", "label": "ĐVT"},
+            "SoLuong": {"type": "number", "label": "Số lượng"},
+            "SoLuongKiemKe": {"type": "number", "label": "Số lượng kiểm kê"},
             "GhiChu": {"type": "note", "label": "Ghi chú"},
+            "QuanLyThietBi": {"type": "text", "label": "Quản lý thiết bị"},
+            "NoiSuDung": {"type": "text", "label": "Nơi sử dụng"},
+            "QuanLyPhong": {"type": "text", "label": "Quản lý phòng"},
+            "TrangThai": {"type": "text", "label": "Trạng thái"},
+            "NgayKiemKe": {"type": "date", "label": "Ngày kiểm kê"},
+            "TrangThaiKiemKe": {"type": "text", "label": "Trạng thái kiểm kê"},
+            "NgayXacNhan": {"type": "date", "label": "Ngày xác nhận"},
+            "TrangThaiXacNhan": {"type": "text", "label": "Trạng thái xác nhận"},
+            "DotKiemKe": {"type": "text", "label": "Đợt kiểm kê"},
+            # Không bắt buộc: có cột thì app ghi thêm, không có thì bỏ qua
+            "NguoiKiemKe": {"type": "text", "label": "Người kiểm kê"},
+            "NguoiXacNhan": {"type": "text", "label": "Người xác nhận"},
         },
     },
     PHAN_QUYEN: {

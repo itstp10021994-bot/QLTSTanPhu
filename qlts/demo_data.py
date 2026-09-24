@@ -41,6 +41,10 @@ def build_demo_data() -> dict:
         ("111032", "Máy chấm công", "ZKTeco, MB80-SL", "", "Trệt_PH001", "Bình thường", "T002172001", 4_500_000, "2023-08-22"),
         ("111032", "Máy chấm công", "ZKTeco, MB80-SL", "", "L1_PH104", "Bình thường", "T002172002", 4_500_000, "2023-08-22"),
         ("111036", "Máy Tính Xách Tay", "Dell, 16RAM - 512 SSD", "", "Kho_TB", "Mới", "T000231002", 22_000_000, "2023-11-01"),
+        ("111051", "Loa phát thanh", "Guinness, Loa, KS-103G", "", "L1_PH103", "Bình thường", "", 1_200_000, "2024-09-05"),
+        ("111051", "Loa phát thanh", "Guinness, Loa, KS-103G", "", "L1_PH103", "Bình thường", "", 1_200_000, "2024-09-05"),
+        ("111051", "Loa phát thanh", "Guinness, Loa, KS-103G", "", "L1_PH103", "Mới", "", 1_200_000, "2024-09-05"),
+        ("111051", "Loa phát thanh", "Âm thanh thông báo", "", "L1_PH103", "Bình thường", "", 900_000, "2022-01-10"),
     ]
     counters: dict[str, int] = {}
     thiet_bi = []

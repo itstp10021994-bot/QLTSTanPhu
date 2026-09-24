@@ -3,10 +3,7 @@ import streamlit as st
 from qlts import auth, kiemke, thietbi
 
 user = auth.require()
-st.subheader("Kiểm kê phòng tôi quản lý")
+st.subheader("Xác nhận kiểm kê phòng tôi quản lý")
+st.caption("Xem kết quả Ban kiểm kê đã kiểm và xác nhận đồng ý / không đồng ý cho từng phòng.")
 
-rooms = thietbi.rooms_managed_by(user.email)
-if not rooms:
-    st.info("Bạn chưa được phân công quản lý phòng nào.")
-else:
-    kiemke.render(user, rooms, key="user_kk", allow_update_status=False)
+kiemke.render_confirm(user, thietbi.rooms_managed_by(user.email), key="user_kk")

@@ -49,9 +49,11 @@ SAMPLES = {
         "LyDo": "Cấp cho phòng học",
     },
     schema.KIEM_KE: {
-        "Title": "111028-00001", "TenThietBi": "Máy chiếu", "MaPhong": "Trệt_PH001",
-        "DotKiemKe": "Năm học 2026-2027", "SoLuongSoSach": 1, "SoLuongThucTe": 1, "TinhTrang": "Bình thường",
-        "NguoiKiemKe": "kiemke@truong.edu.vn", "NgayKiemKe": date(2026, 9, 1), "GhiChu": "",
+        "MaTaiSan": "111042", "STT": 1, "TenTaiSan": "Tivi", "DacDiem": "Sharp, 58 inch, UE630X", "DVT": "Cái",
+        "SoLuong": 1, "SoLuongKiemKe": 1, "GhiChu": "", "QuanLyThietBi": "Lê Thiên An", "NoiSuDung": "Bảo vệ",
+        "QuanLyPhong": "Nguyễn Trọng Hòa", "TrangThai": "Bình thường", "NgayKiemKe": date(2025, 11, 5),
+        "TrangThaiKiemKe": "Đã kiểm kê", "NgayXacNhan": None, "TrangThaiXacNhan": "",
+        "DotKiemKe": "Đợt 2 năm 2024 - 2025", "NguoiKiemKe": "kiemke@truong.edu.vn", "NguoiXacNhan": "",
     },
     schema.PHAN_QUYEN: {
         "Title": "email_cua_ban@truong.edu.vn", "HoTen": "Lê Thiên An", "VaiTro": schema.ROLE_ADMIN,
@@ -65,7 +67,11 @@ NOTES = {
     "QuanLyPhong": "Email người quản lý phòng – người này thấy phòng ở mục Người dùng",
     "TinhTrang": "Gợi ý: " + ", ".join(schema.TINH_TRANG),
     "VaiTro": "Một trong: " + ", ".join(schema.ROLES) + " (mỗi vai trò một dòng)",
-    "SoLuongThucTe": "1 = có mặt, 0 = không tìm thấy",
+    "SoLuong": "Số lượng sổ sách = tổng thiết bị cùng Mã tài sản + Đặc điểm + Nơi sử dụng",
+    "TrangThaiKiemKe": "Đang kiểm kê / Đã kiểm kê (app ghi khi bấm Xác nhận kiểm kê)",
+    "TrangThaiXacNhan": "Đã xác nhận / Không đồng ý (quản lý phòng xác nhận)",
+    "NguoiKiemKe": "Không bắt buộc – có cột thì app ghi email người kiểm kê",
+    "NguoiXacNhan": "Không bắt buộc – có cột thì app ghi email người xác nhận",
     "Title": "",
 }
 
@@ -73,7 +79,7 @@ FILES = {
     schema.THIET_BI: ("1_ThietBi.xlsx", "Data_Thietbichitiet (hoặc tên bạn chọn)"),
     schema.PHONG: ("2_Phong.xlsx", "Phong"),
     schema.DIEU_CHUYEN: ("3_DieuChuyen.xlsx", "DieuChuyen"),
-    schema.KIEM_KE: ("4_KiemKe.xlsx", "KiemKe"),
+    schema.KIEM_KE: ("4_KiemKe.xlsx", "Data_Thietbi"),
     schema.PHAN_QUYEN: ("5_PhanQuyen.xlsx", "PhanQuyen"),
 }
 
