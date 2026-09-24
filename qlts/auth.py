@@ -122,7 +122,8 @@ def relogin_screen(message: str = "Phiên làm việc với SharePoint đã hế
 OTP_TTL = 600  # giây
 OTP_COOLDOWN = 60
 OTP_MAX_TRIES = 5
-SESSION_PARAM = "s"
+SESSION_PARAM = "s"  # cách cũ (token trên URL) – vẫn nhận để link/dấu trang cũ còn dùng được
+SESSION_COOKIE = "qlts_session"
 
 
 def _session_secret() -> bytes:
@@ -217,8 +218,30 @@ def _login_screen_otp() -> None:
             st.error(f"Mã không đúng (còn {OTP_MAX_TRIES - pending['tries']} lần thử).")
         else:
             st.session_state.pop("otp", None)
-            st.query_params[SESSION_PARAM] = make_session_token(pending["email"])
+            st.session_state.pop("logged_out", None)
+            st.session_state["session_token"] = make_session_token(pending["email"])
             st.rerun()
+
+
+def _session_token() -> str:
+    """Token phiên: trong phiên đang mở > trên URL (cách cũ) > cookie trình duyệt."""
+    token = st.session_state.get("session_token", "")
+    if SESSION_PARAM in st.query_params:
+        token = token or st.query_params[SESSION_PARAM]
+        del st.query_params[SESSION_PARAM]  # không để token trên thanh địa chỉ (tránh lộ khi chia sẻ link)
+    if not token and not st.session_state.get("logged_out"):
+        # st.context.cookies chỉ đọc lúc mở kết nối -> sau khi đăng xuất phải bỏ qua cookie cũ
+        token = st.context.cookies.get(SESSION_COOKIE, "")
+    return token
+
+
+def _write_cookie(value: str, max_age: int) -> None:
+    """Ghi/xóa cookie phiên ngay trên trang ứng dụng (cùng tên miền với kết nối của Streamlit)."""
+    st.html(
+        "<script>document.cookie = " + json.dumps(f"{SESSION_COOKIE}={value}; path=/; max-age={max_age}; SameSite=Lax")
+        + " + (location.protocol === 'https:' ? '; Secure' : '');</script>",
+        unsafe_allow_javascript=True,
+    )
 
 
 def current_user() -> CurrentUser | None:
@@ -235,17 +258,19 @@ def current_user() -> CurrentUser | None:
         return _build_user(email, st.user.get("name") or "")
 
     if login_mode() == "otp":
-        # Streamlit xóa query params khi chuyển trang -> giữ token trong session_state và ghi lại lên URL
-        # (để tải lại trang / mở lại dấu trang vẫn còn đăng nhập)
-        token = st.query_params.get(SESSION_PARAM) or st.session_state.get("session_token", "")
-        email = read_session_token(token)
+        token = _session_token()
+        email = read_session_token(token) if token else None
         if not email:
             st.session_state.pop("session_token", None)
+            if st.session_state.get("logged_out"):
+                _write_cookie("", 0)
             _login_screen_otp()
             return None
         st.session_state["session_token"] = token
-        if st.query_params.get(SESSION_PARAM) != token:
-            st.query_params[SESSION_PARAM] = token
+        if st.session_state.get("cookie_written") != token:
+            # Lưu vào cookie trình duyệt: tải lại trang / mở lại trình duyệt vẫn còn đăng nhập
+            _write_cookie(token, int(float(app_setting("session_days", 7)) * 86400))
+            st.session_state["cookie_written"] = token
         return _build_user(email)
 
     email = st.session_state.get("demo_email")
@@ -260,7 +285,9 @@ def logout() -> None:
         st.logout()
     elif login_mode() == "otp":
         st.query_params.pop(SESSION_PARAM, None)
-        st.session_state.pop("session_token", None)
+        for k in ("session_token", "cookie_written"):
+            st.session_state.pop(k, None)
+        st.session_state["logged_out"] = True  # màn hình đăng nhập sẽ xóa cookie
         st.rerun()
     else:
         st.session_state.pop("demo_email", None)
