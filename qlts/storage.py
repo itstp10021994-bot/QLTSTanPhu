@@ -28,6 +28,7 @@ from . import schema
 from .config import app_setting, sharepoint_config
 
 GRAPH = "https://graph.microsoft.com/v1.0"
+COLUMNS_TTL = 900  # giây – dò lại cột SharePoint sau 15 phút (phòng khi list bị sửa)
 
 
 class StorageError(RuntimeError):
@@ -126,6 +127,7 @@ class SharePointStore:
         # Ánh xạ cột cố định: {"ThietBi": {"TenThietBi": "TenTB"}} (tên nội bộ hoặc tên hiển thị)
         self.column_map: dict = cfg.get("columns", {})
         self._columns: dict[str, dict] = {}
+        self._columns_at: dict[str, float] = {}
         self._list_ids: dict[str, str] = {}  # khóa list trong app -> ID list SharePoint
         self._resolved_names: dict[str, str] = {}
         self.list_web_urls: dict[str, str] = {}
@@ -233,7 +235,7 @@ class SharePointStore:
     def columns(self, list_name: str) -> dict:
         """Khóa app -> {"name": tên nội bộ, "kind": kiểu SharePoint, "readonly": bool}.
         Cột không tìm thấy thì không có trong kết quả."""
-        if list_name in self._columns:
+        if list_name in self._columns and time.time() - self._columns_at.get(list_name, 0) < COLUMNS_TTL:
             return self._columns[list_name]
         sp_cols = self.sp_columns(list_name)
         by_name = {c["name"]: c for c in sp_cols}
@@ -270,6 +272,7 @@ class SharePointStore:
                     used.add(col["name"])
                     break
         self._columns[list_name] = resolved
+        self._columns_at[list_name] = time.time()
         return resolved
 
     def _encode(self, list_name: str, key: str, value):
@@ -305,6 +308,29 @@ class SharePointStore:
 
     # -- CRUD --
     def list_items(self, list_name: str) -> list[dict]:
+        try:
+            return self._list_items_once(list_name)
+        except TokenExpired:
+            raise
+        except StorageError as exc:
+            if "does not exist" not in str(exc) and "không tồn tại" not in str(exc):
+                raise
+            # Cột vừa bị xóa/đổi tên trên SharePoint: dò lại cột rồi thử lại một lần
+            self.forget_schema(list_name)
+            return self._list_items_once(list_name)
+
+    def forget_schema(self, list_name: str | None = None) -> None:
+        """Quên thông tin cột/list đã dò (để dò lại sau khi sửa list trên SharePoint)."""
+        if list_name:
+            self._columns.pop(list_name, None)
+            self._columns_at.pop(list_name, None)
+        else:
+            self._columns.clear()
+            self._columns_at.clear()
+            self._list_ids.clear()
+            self._resolved_names.clear()
+
+    def _list_items_once(self, list_name: str) -> list[dict]:
         cols = self.columns(list_name)
         select = ",".join(sorted({c["name"] for c in cols.values()} | {"id"}))
         url = f"{self._list_url(list_name)}/items?$expand=fields($select={select})&$top=999"
@@ -399,7 +425,14 @@ def _error_text(data) -> str:
     """Lấy thông báo lỗi từ phản hồi SharePoint REST / flow (nhiều dạng khác nhau)."""
     if not isinstance(data, dict):
         return str(data)[:300]
-    err = data.get("odata.error") or data.get("error") or data.get("raw") or ""
+    msg = data.get("message")
+    if isinstance(msg, str) and "odata.error" in msg:  # lỗi của bước "Send an HTTP request to SharePoint"
+        try:
+            inner = json.loads(msg[msg.index("{"):msg.rindex("}") + 1])
+            return _error_text(inner)
+        except ValueError:
+            return msg.split("\r\n")[0][:300]
+    err = data.get("odata.error") or data.get("error") or data.get("raw") or msg or ""
     if isinstance(err, dict):
         msg = err.get("message", "")
         return msg.get("value", "") if isinstance(msg, dict) else str(msg)
@@ -497,7 +530,7 @@ class BridgeStore(SharePointStore):
         return cols
 
     # -- CRUD --
-    def list_items(self, list_name: str) -> list[dict]:
+    def _list_items_once(self, list_name: str) -> list[dict]:
         cols = {k: c for k, c in self.columns(list_name).items() if c["kind"] not in ("personOrGroup", "lookup")}
         select = ",".join(sorted({c["name"] for c in cols.values()} | {"Id"}))
         uri = f"{self._list_uri(list_name)}/items?$select={select}&$top=5000"
@@ -727,8 +760,13 @@ def load_fresh(list_name: str) -> pd.DataFrame:
     return _to_frame(list_name, get_store().list_items(list_name))
 
 
-def refresh() -> None:
+def refresh(schema_too: bool = False) -> None:
+    """Xóa bộ nhớ đệm dữ liệu; ``schema_too`` = dò lại cả cột/list (nút Làm mới)."""
     _load.clear()
+    if schema_too:
+        store = get_store()
+        if hasattr(store, "forget_schema"):
+            store.forget_schema()
 
 
 def create(list_name: str, fields: dict) -> str:

@@ -66,8 +66,9 @@ with st.sidebar:
     st.divider()
     st.caption(f"Đăng nhập: **{user.email}**")
     c1, c2 = st.columns(2)
-    if c1.button("Làm mới", icon=":material/refresh:", width="stretch"):
-        storage.refresh()
+    if c1.button("Làm mới", icon=":material/refresh:", width="stretch",
+                 help="Tải lại dữ liệu và dò lại cột SharePoint (sau khi sửa list trên SharePoint)."):
+        storage.refresh(schema_too=True)
         st.rerun()
     if c2.button("Đăng xuất", icon=":material/logout:", width="stretch"):
         auth.logout()
