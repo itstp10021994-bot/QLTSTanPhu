@@ -56,6 +56,7 @@ if user.is_admin:
     sections["Phân quyền"] = [
         page("phan_quyen_admin.py", "Phân quyền admin", ":material/admin_panel_settings:"),
         page("phan_quyen_phong.py", "Phân quyền quản lý phòng", ":material/manage_accounts:"),
+        page("xuat_nhap.py", "Xuất / nhập biểu mẫu", ":material/import_export:"),
     ]
     if not storage.is_demo():
         sections["Phân quyền"].append(page("khoi_tao_sharepoint.py", "Khởi tạo SharePoint", ":material/build:"))

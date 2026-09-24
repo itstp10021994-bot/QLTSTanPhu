@@ -11,7 +11,7 @@ Phiên bản Python (Streamlit) của app Power Apps **STP_Thietbi**. Dữ liệ
 | Ban kiểm kê | Kiểm kê theo đợt / nơi sử dụng: gộp thiết bị cùng Mã tài sản + Đặc điểm + Nơi sử dụng, nhập Số lượng kiểm kê → **Xác nhận kiểm kê**; xem kết quả, xuất Excel | Quản trị, Ban kiểm kê |
 | Người dùng | Danh sách Phòng đang quản lý · Kiểm kê: quản lý phòng **xác nhận** (đồng ý / không đồng ý) kết quả của Ban kiểm kê | Mọi người đăng nhập |
 | Báo cáo | Báo cáo tổng quan BGH: số liệu, biểu đồ, tiến độ kiểm kê, thiết bị hỏng, xuất Excel | Quản trị, BGH, Ban quản lý tài sản |
-| Phân quyền | Phân quyền admin (vai trò) · Phân quyền quản lý phòng (danh mục phòng + người phụ trách) · Khởi tạo SharePoint | Quản trị |
+| Phân quyền | Phân quyền admin (vai trò) · Phân quyền quản lý phòng (danh mục phòng + người phụ trách) · **Xuất / nhập biểu mẫu** (tải biểu mẫu Excel, xuất dữ liệu, nhập hàng loạt vào mọi list) · Khởi tạo SharePoint | Quản trị |
 
 ## Cấu trúc SharePoint List
 
@@ -168,6 +168,7 @@ qlts/storage.py         # SharePointStore (Graph API) + LocalStore (demo), cache
 qlts/auth.py            # đăng nhập Microsoft (st.login) / demo, phân quyền
 qlts/thietbi.py         # nghiệp vụ thiết bị: sinh mã chi tiết, phòng, người quản lý phòng
 qlts/kiemke.py          # màn hình kiểm kê dùng chung
+qlts/excel_io.py        # biểu mẫu Excel, xuất dữ liệu, đọc file nhập, lập kế hoạch thêm/cập nhật
 qlts/ui.py              # header, footer, bảng, bộ lọc, xuất Excel
 views/*.py              # từng chức năng trong menu
 qlts/sp_setup.py        # tạo list/cột trên SharePoint (trang Khởi tạo + script)

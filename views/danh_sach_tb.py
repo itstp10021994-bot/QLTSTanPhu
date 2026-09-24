@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from qlts import auth, schema, storage, thietbi, ui
+from qlts import auth, excel_io, schema, storage, thietbi, ui
 
 user = auth.require(schema.ROLE_QLTS)
 st.subheader("Danh sách thiết bị")
@@ -30,15 +30,6 @@ def to_editor(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def parse_number(value):
-    """'12000000', '12000000.0', '12.000.000', '12,000,000' -> 12000000."""
-    text = str(value).strip().replace(" ", "")
-    num = pd.to_numeric(text, errors="coerce")
-    if pd.isna(num):
-        num = pd.to_numeric(text.replace(".", "").replace(",", ""), errors="coerce")
-    return None if pd.isna(num) else float(num)
-
-
 def same(a, b) -> bool:
     if pd.isna(a) and pd.isna(b):
         return True
@@ -48,27 +39,8 @@ def same(a, b) -> bool:
 
 
 def new_row_fields(row: dict, used_codes: dict, stt: list) -> dict | str:
-    """Chuẩn bị một dòng mới: sinh Mã chi tiết, STT, Quản lý phòng. Trả về chuỗi lỗi nếu thiếu dữ liệu."""
     fields = {k: v for k, v in row.items() if k in all_cols and not (isinstance(v, float) and pd.isna(v))}
-    ma = str(fields.get("MaTaiSan") or "").strip()
-    code = str(fields.get("MaChiTiet") or "").strip()
-    if not code:
-        if not ma:
-            return "thiếu Mã tài sản"
-        fresh = used_codes.setdefault(ma, [])
-        code = thietbi.next_detail_codes(pd.DataFrame({"MaChiTiet": [*tb["MaChiTiet"], *fresh]}), ma)[0]
-        fresh.append(code)
-    elif not ma and "-" in code:
-        ma = code.rsplit("-", 1)[0]
-    fields["MaTaiSan"], fields["MaChiTiet"] = ma, code
-    if not fields.get("STT"):
-        stt[0] += 1
-        fields["STT"] = stt[0]
-    room = str(fields.get("NoiSuDung") or "").strip()
-    if room and not fields.get("QuanLyPhong"):
-        fields["QuanLyPhong"] = managers.get(room, "")
-    fields.setdefault("QuanLyThietBi", user.name)
-    return fields
+    return thietbi.prepare_new(fields, list(tb["MaChiTiet"]), used_codes, stt, managers, user.name)
 
 
 tab_edit, tab_import = st.tabs(["Xem & sửa", "Nhập / xuất Excel"])
@@ -154,8 +126,7 @@ with tab_import:
     export = tb.drop(columns="id").rename(columns=labels)
     st.download_button("Tải toàn bộ danh sách (Excel)", ui.to_excel({"ThietBi": export}),
                        file_name="danh_sach_thiet_bi.xlsx", icon=":material/download:")
-    template = pd.DataFrame(columns=[labels[c] for c in all_cols if c not in ("STT",)])
-    st.download_button("Tải file mẫu để nhập", ui.to_excel({"ThietBi": template}),
+    st.download_button("Tải file mẫu để nhập", excel_io.template_workbook(TB, "Thiết bị"),
                        file_name="mau_nhap_thiet_bi.xlsx", icon=":material/description:")
 
     st.markdown("##### Nhập từ Excel")
@@ -163,52 +134,24 @@ with tab_import:
         "Dòng đầu là tên cột (như file mẫu). Dòng có **Mã chi tiết đã tồn tại** sẽ được cập nhật; dòng mới "
         "để trống Mã chi tiết thì app tự sinh theo Mã tài sản. Ô trống không ghi đè dữ liệu đang có."
     )
-    upload = st.file_uploader("Chọn file .xlsx hoặc .csv", type=["xlsx", "csv"])
+    upload = st.file_uploader("Chọn file .xlsx hoặc .csv", type=["xlsx", "csv"], key=f"ds_upload_{version}")
     if upload is not None:
-        raw = pd.read_csv(upload, dtype=str) if upload.name.endswith(".csv") else pd.read_excel(upload, dtype=str)
-        by_label = {schema_label.lower(): key for key, schema_label in labels.items()}
-        by_label.update({k.lower(): k for k in all_cols})
-        rename = {c: by_label[str(c).strip().lower()] for c in raw.columns if str(c).strip().lower() in by_label}
-        unknown = [c for c in raw.columns if c not in rename]
-        data = raw.rename(columns=rename)[list(rename.values())].dropna(how="all")
-        st.write(f"Đọc được **{len(data)}** dòng, **{len(rename)}** cột khớp.")
+        data, unknown = excel_io.read_upload(upload, TB)
+        st.write(f"Đọc được **{len(data)}** dòng, **{len(data.columns)}** cột khớp.")
         if unknown:
-            st.warning("Bỏ qua các cột không nhận ra: " + ", ".join(map(str, unknown)))
-        st.dataframe(data.head(20), hide_index=True, width="stretch")
-
-        existing = tb.drop_duplicates("MaChiTiet").set_index("MaChiTiet")
-        ops, problems = [], []
-        used_codes: dict = {}
-        stt = [int(tb["STT"].max()) if not tb.empty else 0]
-        for n, row in enumerate(data.to_dict("records"), start=2):
-            row = {k: v.strip() if isinstance(v, str) else v for k, v in row.items() if not pd.isna(v) and v != ""}
-            for c in num_cols:
-                if c in row:
-                    row[c] = parse_number(row[c])
-            for c in date_cols:
-                if c in row:
-                    d = pd.to_datetime(row[c], dayfirst=True, errors="coerce")
-                    row[c] = d.date() if not pd.isna(d) else row[c]
-            code = str(row.get("MaChiTiet", ""))
-            if code and code in existing.index:
-                ops.append(("update", existing.loc[code, "id"], row))
-            else:
-                fields = new_row_fields(row, used_codes, stt)
-                if isinstance(fields, str):
-                    problems.append(f"Dòng Excel {n}: {fields}")
-                else:
-                    ops.append(("create", fields))
-        n_upd = sum(op[0] == "update" for op in ops)
-        st.info(f"Sẽ cập nhật **{n_upd}** thiết bị và thêm mới **{len(ops) - n_upd}** thiết bị.")
-        for p in problems[:20]:
+            st.warning("Bỏ qua các cột không nhận ra: " + ", ".join(unknown))
+        st.dataframe(data.head(20).astype(object).fillna("").rename(columns=labels), hide_index=True, width="stretch")
+        plan = excel_io.plan_import(TB, data, tb, update_existing=True, user_name=user.name, managers=managers)
+        st.info(f"Sẽ cập nhật **{plan['update']}** thiết bị và thêm mới **{plan['create']}** thiết bị.")
+        for p in plan["problems"][:20]:
             st.error(p)
-        if st.button("Nhập vào SharePoint", type="primary", icon=":material/upload:", disabled=not ops):
+        if st.button("Nhập vào SharePoint", type="primary", icon=":material/upload:", disabled=not plan["ops"]):
             bar = st.progress(0.0, text="Đang nhập...")
-            errors = storage.batch(TB, ops, progress=lambda f: bar.progress(f, text="Đang nhập..."))
+            errors = storage.batch(TB, plan["ops"], progress=lambda f: bar.progress(f, text="Đang nhập..."))
             bar.empty()
             if errors:
                 st.error(f"Có {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:20]))
             else:
-                ui.flash(f"Đã nhập {len(ops)} dòng từ Excel.")
+                ui.flash(f"Đã nhập {len(plan['ops'])} dòng từ Excel.")
                 st.session_state["ds_version"] = version + 1
                 st.rerun()

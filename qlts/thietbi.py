@@ -71,3 +71,32 @@ def rooms_managed_by(email: str) -> list[str]:
     from_items = set(tb[tb["QuanLyPhong"].str.strip().str.lower() == email]["NoiSuDung"])
     from_list = {r for r, m in room_managers().items() if m == email}
     return sorted((from_items | from_list) - {"", schema.NOI_THANH_LY})
+
+
+def prepare_new(fields: dict, existing_codes: list[str], used_codes: dict, stt: list, managers: dict,
+                user_name: str) -> dict | str:
+    """Chuẩn bị một thiết bị mới: sinh Mã chi tiết, STT, Quản lý phòng, Quản lý thiết bị.
+
+    ``used_codes`` / ``stt`` được cập nhật tại chỗ để nhiều dòng mới liên tiếp không trùng mã.
+    Trả về chuỗi lỗi nếu thiếu dữ liệu.
+    """
+    fields = dict(fields)
+    ma = str(fields.get("MaTaiSan") or "").strip()
+    code = str(fields.get("MaChiTiet") or "").strip()
+    if not code:
+        if not ma:
+            return "thiếu Mã tài sản"
+        fresh = used_codes.setdefault(ma, [])
+        code = next_detail_codes(pd.DataFrame({"MaChiTiet": [*existing_codes, *fresh]}), ma)[0]
+        fresh.append(code)
+    elif not ma and "-" in code:
+        ma = code.rsplit("-", 1)[0]
+    fields["MaTaiSan"], fields["MaChiTiet"] = ma, code
+    if not fields.get("STT"):
+        stt[0] += 1
+        fields["STT"] = stt[0]
+    room = str(fields.get("NoiSuDung") or "").strip()
+    if room and not fields.get("QuanLyPhong"):
+        fields["QuanLyPhong"] = managers.get(room, "")
+    fields.setdefault("QuanLyThietBi", user_name)
+    return fields
