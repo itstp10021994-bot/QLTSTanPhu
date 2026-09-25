@@ -211,14 +211,19 @@ def selection_actions(key: str, count: int, *, edit: bool = True, delete: bool =
     return edit_clicked, del_clicked
 
 
-def party_picker(container, label: str, default: str = "", key: str = "") -> tuple[str, str]:
+def party_picker(container, label: str, default: str = "", key: str = "", inline: bool = False) -> tuple[str, str]:
     """Chọn một người trong danh sách user -> (Họ tên, Chức vụ), tự điền theo Phân quyền, cho phép sửa."""
     from . import thietbi
 
     with container:
-        who = user_picker(st, label, default=default, key=f"{key}_who", blank="(Chọn người)")
+        if inline:
+            c0, c1, c2 = st.columns([3, 2, 2])
+        else:
+            c0 = st
+        who = user_picker(c0, label, default=default, key=f"{key}_who", blank="(Chọn người)")
         name, title = thietbi.person_info(who) if who else ("", "")
-        c1, c2 = st.columns(2)
+        if not inline:
+            c1, c2 = st.columns(2)
         name = c1.text_input("Họ và tên", name, key=f"{key}_name_{who}")
         title = c2.text_input("Chức vụ", title, key=f"{key}_title_{who}",
                               help="Tự lấy theo Chức danh ở Phân quyền admin; sửa nếu cần.")
