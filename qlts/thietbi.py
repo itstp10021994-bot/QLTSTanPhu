@@ -189,3 +189,20 @@ def suggest_user(room: str) -> str:
     if not used.empty:
         return used.str.strip().str.lower().mode().iloc[0]
     return room_managers().get(room, "")
+
+
+def person_info(email_or_name: str) -> tuple[str, str]:
+    """(Họ tên, Chức vụ) của một người: chức vụ lấy theo Phân quyền (Chức danh), họ tên theo danh sách user."""
+    key = (email_or_name or "").strip()
+    if "@" not in key:
+        return key, ""
+    key = key.lower()
+    pq = storage.load(schema.PHAN_QUYEN)
+    mine = pq[pq["Title"].str.strip().str.lower() == key]
+    name = next((n for n in mine["HoTen"] if n), "")
+    title = next((c for c in mine["ChucDanh"] if c), "")
+    if not name:
+        phong = storage.load(schema.PHONG)
+        managed = phong[phong["NguoiQuanLy"].str.strip().str.lower() == key]
+        name = next((n for n in managed["TenNguoiQuanLy"] if n), "") or user_directory().get(key, "")
+    return name or key, title

@@ -209,3 +209,36 @@ def selection_actions(key: str, count: int, *, edit: bool = True, delete: bool =
         hint += " Chọn đúng 1 dòng để sửa."
     cols[2].caption(hint + (" " + extra if extra else ""))
     return edit_clicked, del_clicked
+
+
+def party_picker(container, label: str, default: str = "", key: str = "") -> tuple[str, str]:
+    """Chọn một người trong danh sách user -> (Họ tên, Chức vụ), tự điền theo Phân quyền, cho phép sửa."""
+    from . import thietbi
+
+    with container:
+        who = user_picker(st, label, default=default, key=f"{key}_who", blank="(Chọn người)")
+        name, title = thietbi.person_info(who) if who else ("", "")
+        c1, c2 = st.columns(2)
+        name = c1.text_input("Họ và tên", name, key=f"{key}_name_{who}")
+        title = c2.text_input("Chức vụ", title, key=f"{key}_title_{who}",
+                              help="Tự lấy theo Chức danh ở Phân quyền admin; sửa nếu cần.")
+    return name.strip(), title.strip()
+
+
+def bienban_downloads(docs, file_stem: str, key: str, formats=("pdf", "xlsx", "docx")) -> None:
+    """Các nút tải biên bản (tạo file khi bấm)."""
+    from . import bienban
+
+    spec = {
+        "pdf": ("Tải PDF (in)", bienban.to_pdf, "application/pdf", ":material/picture_as_pdf:"),
+        "xlsx": ("Tải Excel", bienban.to_xlsx,
+                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ":material/table:"),
+        "docx": ("Tải Word (theo mẫu)", bienban.to_docx,
+                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ":material/description:"),
+    }
+    cols = st.columns(len(formats))
+    for col, fmt in zip(cols, formats):
+        label, fn, mime, icon = spec[fmt]
+        col.download_button(label, data=lambda fn=fn: fn(docs), file_name=f"{file_stem}.{fmt}", mime=mime,
+                            icon=icon, key=f"{key}_{fmt}", width="stretch", on_click="ignore",
+                            type="primary" if fmt == formats[0] else "secondary")

@@ -44,6 +44,7 @@ if user.has_any(ROLE_QLTS):
         page("chinh_sua.py", "Chỉnh sửa thông tin thiết bị", ":material/settings:"),
         page("dieu_chuyen.py", "Điều chuyển thiết bị", ":material/swap_horiz:"),
     ]
+    sections["Bàn giao"] = [page("ban_giao.py", "Biên bản bàn giao", ":material/assignment:")]
 if user.has_any(ROLE_KIEMKE):
     sections["Ban kiểm kê"] = [page("kiem_ke.py", "Kiểm kê", ":material/fact_check:")]
 sections["Người dùng"] = [
