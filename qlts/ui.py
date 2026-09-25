@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import io
 from pathlib import Path
 
@@ -38,9 +39,9 @@ def header(user_name: str) -> None:
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(
         f"""<div class="qlts-header">
-              <div class="qlts-school">{school}</div>
-              <div class="qlts-title">{title}</div>
-              <div class="qlts-user">{user_name}</div>
+              <div class="qlts-school">{html.escape(str(school))}</div>
+              <div class="qlts-title">{html.escape(str(title))}</div>
+              <div class="qlts-user">{html.escape(user_name)}</div>
             </div>""",
         unsafe_allow_html=True,
     )
@@ -55,7 +56,7 @@ def header(user_name: str) -> None:
 
 def footer() -> None:
     text = app_setting("footer", "Ứng dụng được phát triển bởi trường TH, THCS và THPT Tân Phú")
-    st.markdown(f'<div class="qlts-footer">{text}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="qlts-footer">{html.escape(str(text))}</div>', unsafe_allow_html=True)
 
 
 def logo_path() -> str | None:

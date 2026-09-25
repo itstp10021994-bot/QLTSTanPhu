@@ -152,8 +152,10 @@ def read_session_token(token: str) -> str | None:
     return email
 
 
-def known_emails() -> set[str]:
-    """Email được phép đăng nhập: có trong Phân quyền, danh mục phòng, cột Quản lý phòng, hoặc admin_emails."""
+def known_emails(strict: bool = False) -> set[str] | None:
+    """Email được phép đăng nhập: có trong Phân quyền, danh mục phòng, cột Quản lý phòng, hoặc admin_emails.
+
+    ``strict``: trả ``None`` nếu không đọc được SharePoint (để không khóa nhầm mọi người khi flow lỗi)."""
     emails = set(admin_emails())
     try:
         storage.prefetch([schema.PHAN_QUYEN, schema.PHONG, schema.THIET_BI])
@@ -161,8 +163,24 @@ def known_emails() -> set[str]:
         emails |= set(storage.load(schema.PHONG)["NguoiQuanLy"].str.strip().str.lower())
         emails |= set(storage.load(schema.THIET_BI)["QuanLyPhong"].str.strip().str.lower())
     except storage.StorageError:
-        pass
+        if strict:
+            return None
     return {e for e in emails if "@" in e}
+
+
+def _revoked(email: str) -> bool:
+    """Phiên còn hạn nhưng email đã bị gỡ khỏi mọi danh sách được phép -> thu hồi quyền truy cập ngay."""
+    allowed = known_emails(strict=True)
+    return allowed is not None and email.strip().lower() not in allowed
+
+
+def _deny_revoked() -> None:
+    for k in ("session_token", "stored_token"):
+        st.session_state.pop(k, None)
+    st.session_state["logged_out"] = True
+    _browser_store({"clear": True})
+    st.error("Tài khoản này không còn quyền sử dụng ứng dụng (đã bị gỡ khỏi danh sách phân quyền). "
+             "Liên hệ quản trị viên nếu cần.")
 
 
 def _hash_code(email: str, code: str) -> str:
@@ -273,6 +291,9 @@ def _otp_user() -> CurrentUser | None:
             _browser_store({"write": token, "max_age": int(float(app_setting("session_days", 7)) * 86400)})
             st.session_state["stored_token"] = token
         st.session_state["session_token"] = token
+        if _revoked(read_session_token(token)):
+            _deny_revoked()
+            return None
         return _build_user(read_session_token(token))
 
     st.session_state.pop("session_token", None)
@@ -285,6 +306,9 @@ def _otp_user() -> CurrentUser | None:
     token = stored or st.context.cookies.get(SESSION_COOKIE, "")
     email = read_session_token(token) if token else None
     if email:
+        if _revoked(email):
+            _deny_revoked()
+            return None
         st.session_state["session_token"] = st.session_state["stored_token"] = token
         return _build_user(email)
     if stored is None:
