@@ -214,3 +214,28 @@ def person_info(email_or_name: str) -> tuple[str, str]:
         managed = phong[phong["NguoiQuanLy"].str.strip().str.lower() == key]
         name = next((n for n in managed["TenNguoiQuanLy"] if n), "") or user_directory().get(key, "")
     return name or key, title
+
+
+def manager_mismatches(tb: pd.DataFrame, phong: pd.DataFrame, rooms: set | None = None) -> pd.DataFrame:
+    """Thiết bị (chưa thanh lý) có cột Quản lý phòng khác người quản lý trong danh mục phòng.
+
+    Chỉ xét phòng có ghi người quản lý trong danh mục (hoặc các phòng trong ``rooms`` – kể cả khi đã bỏ trống).
+    Trả về các dòng thiết bị kèm cột ``_new`` = email đúng."""
+    target = {r.Title: r.NguoiQuanLy.strip().lower() for r in phong.itertuples()
+              if r.NguoiQuanLy.strip() or (rooms is not None and r.Title in rooms)}
+    if rooms is not None:
+        target = {r: e for r, e in target.items() if r in rooms}
+    items = tb[tb["NoiSuDung"].isin(target) & ~is_disposed(tb)].copy()
+    items["_new"] = items["NoiSuDung"].map(target)
+    return items[items["QuanLyPhong"].str.strip().str.lower() != items["_new"]]
+
+
+def sync_room_managers(tb: pd.DataFrame, phong: pd.DataFrame, rooms: set | None = None, progress=None
+                       ) -> tuple[int, list[str]]:
+    """Ghi lại cột Quản lý phòng của thiết bị cho khớp danh mục phòng. Trả về (số thiết bị cập nhật, lỗi)."""
+    items = manager_mismatches(tb, phong, rooms)
+    if items.empty:
+        return 0, []
+    errors = storage.batch(schema.THIET_BI, [("update", i, {"QuanLyPhong": e})
+                                             for i, e in zip(items["id"], items["_new"])], progress=progress)
+    return len(items) - len(errors), errors

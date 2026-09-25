@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 from qlts import auth, schema, storage, thietbi, ui
@@ -15,10 +16,38 @@ managers = thietbi.room_managers()
 
 
 def sync_items(room: str, email: str) -> int:
-    """Cập nhật cột Quản lý phòng của các thiết bị trong phòng."""
-    items = tb[(tb["NoiSuDung"] == room) & (tb["QuanLyPhong"].str.strip().str.lower() != email)]
-    storage.batch(schema.THIET_BI, [("update", item_id, {"QuanLyPhong": email}) for item_id in items["id"]])
-    return len(items)
+    """Đồng bộ cột Quản lý phòng của mọi thiết bị trong phòng theo người quản lý mới (kể cả khi bỏ trống)."""
+    target = phong[phong["Title"] == room].assign(NguoiQuanLy=email)
+    if target.empty:
+        target = pd.DataFrame([{"Title": room, "NguoiQuanLy": email}])
+    n, errors = thietbi.sync_room_managers(tb, target, rooms={room})
+    if errors:
+        st.session_state["phong_sync_errors"] = errors
+    return n
+
+
+# ---- Kiểm tra thiết bị có Quản lý phòng lệch với danh mục phòng ----
+lech = thietbi.manager_mismatches(tb, phong)
+errs = st.session_state.pop("phong_sync_errors", None)
+if errs:
+    st.error(f"Có {len(errs)} thiết bị chưa cập nhật được Quản lý phòng:\n\n" + "\n\n".join(errs[:10]))
+if not lech.empty:
+    with st.container(border=True):
+        st.markdown(f"**{len(lech)} thiết bị** ở {lech['NoiSuDung'].nunique()} phòng có cột *Quản lý phòng* "
+                    "khác người quản lý trong danh mục phòng (vd do sửa trực tiếp trên SharePoint hoặc nhập Excel).")
+        with st.expander("Xem chi tiết"):
+            st.dataframe(lech[["MaChiTiet", "TenThietBi", "NoiSuDung", "QuanLyPhong", "_new"]].rename(
+                columns={**schema.labels_of(schema.THIET_BI), "QuanLyPhong": "Quản lý phòng (trên thiết bị)",
+                         "_new": "Quản lý phòng (danh mục)"}), hide_index=True, width="stretch")
+        if st.button(f"Đồng bộ {len(lech)} thiết bị theo danh mục phòng", type="primary", icon=":material/sync:"):
+            bar = st.progress(0.0, text="Đang đồng bộ...")
+            n, errors = thietbi.sync_room_managers(
+                tb, phong, progress=lambda f, t="": bar.progress(f, text=f"Đang đồng bộ... {t}"))
+            bar.empty()
+            if errors:
+                st.session_state["phong_sync_errors"] = errors
+            ui.flash(f"Đã đồng bộ Quản lý phòng cho {n} thiết bị.")
+            st.rerun()
 
 
 # Nơi sử dụng có trên thiết bị nhưng chưa có trong danh mục phòng
@@ -54,7 +83,7 @@ def add_dialog() -> None:
             ten = ten.strip() or thietbi.user_directory().get(email, "")
             storage.create(schema.PHONG, {"Title": code, "TenPhong": name.strip() or code,
                                           "NguoiQuanLy": email, "TenNguoiQuanLy": ten})
-            n = sync_items(code, email) if email else 0
+            n = sync_items(code, email) if email else 0  # phòng mới: chỉ đồng bộ khi có người quản lý
             ui.flash(f"Đã thêm phòng {code}" + (f", cập nhật {n} thiết bị." if n else "."))
             st.rerun()
 
@@ -76,7 +105,7 @@ def edit_dialog(row) -> None:
         if fields:
             with st.spinner("Đang lưu..."):
                 storage.update(schema.PHONG, row.id, fields)
-                if "NguoiQuanLy" in fields and fields["NguoiQuanLy"]:
+                if "NguoiQuanLy" in fields:  # đổi (hoặc bỏ trống) người quản lý -> cập nhật mọi thiết bị trong phòng
                     n = sync_items(row.Title, fields["NguoiQuanLy"])
         ui.flash((f"Đã cập nhật phòng {row.Title}" + (f", cập nhật Quản lý phòng cho {n} thiết bị." if n else "."))
                  if fields else "Không có thay đổi nào.")

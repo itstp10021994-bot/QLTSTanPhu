@@ -133,8 +133,17 @@ if st.button(f"Nhập {len(plan['ops'])} dòng vào {target}", type="primary", i
     else:
         st.session_state["xn_version"] = st.session_state.get("xn_version", 0) + 1
         after = len(storage.load_fresh(list_key))  # đọc lại trực tiếp để xác nhận
+        synced = ""
+        if list_key == schema.PHONG and "NguoiQuanLy" in rows.columns:
+            # Đổi người quản lý phòng qua Excel -> đồng bộ cột Quản lý phòng của thiết bị trong các phòng đó
+            n, sync_errors = thietbi.sync_room_managers(
+                storage.load(schema.THIET_BI), storage.load(schema.PHONG),
+                rooms=set(rows.loc[rows["NguoiQuanLy"].fillna("").astype(str).str.strip() != "", "Title"]
+                          .dropna().astype(str).str.strip()))
+            synced = f" Đồng bộ Quản lý phòng cho {n} thiết bị" + (
+                f" ({len(sync_errors)} lỗi)." if sync_errors else ".")
         where = "dữ liệu DEMO" if storage.is_demo() else f"SharePoint list {real_name(list_key)}"
         ui.flash(f"Đã nhập vào {where}: {plan['create']} thêm mới, {plan['update']} cập nhật, "
                  f"{plan['same']} không đổi. "
-                 f"List hiện có {after} dòng (trước khi nhập: {len(data)}).")
+                 f"List hiện có {after} dòng (trước khi nhập: {len(data)}).{synced}")
         st.rerun()
