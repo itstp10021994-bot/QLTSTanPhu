@@ -167,6 +167,7 @@ with tab_import:
                        + ", ".join(schema.labels_of(TB).get(c, c) for c in _skip))
         for p in plan["problems"][:20]:
             st.error(p)
+        ui.reconcile_panel(TB, data, tb, key=f"ds_rec_{version}")
         if st.button("Nhập vào SharePoint", type="primary", icon=":material/upload:", disabled=not plan["ops"]):
             bar = st.progress(0.0, text="Đang nhập...")
             errors = storage.batch(TB, plan["ops"],

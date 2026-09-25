@@ -315,3 +315,30 @@ def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, updat
         n_create += 1
     return {"ops": ops, "create": n_create, "update": n_update, "same": n_same, "skip": n_skip,
             "problems": problems, "changes": changes}
+
+
+def reconcile(list_key: str, data: pd.DataFrame, existing: pd.DataFrame) -> dict:
+    """Đối chiếu file với dữ liệu trên SharePoint (theo khóa MATCH_KEYS).
+
+    - ``dups``: bản ghi TRÙNG khóa trên SharePoint (giữ bản có id nhỏ nhất, các bản sau là thừa)
+    - ``extra``: bản ghi trên SharePoint có khóa không nằm trong file
+    - ``no_key``: số dòng trong file không có khóa (mỗi lần nhập sẽ luôn tạo mới)
+    """
+    if not MATCH_KEYS[list_key] or existing.empty:
+        return {"dups": existing.iloc[0:0], "extra": existing.iloc[0:0], "no_key": 0}
+    file_keys, no_key = set(), 0
+    for rec in data.to_dict("records"):
+        k = row_key(list_key, rec)
+        if k:
+            file_keys.add(k)
+        else:
+            no_key += 1
+    ex = existing.copy()
+    ex["_k"] = [row_key(list_key, r) for r in ex.to_dict("records")]
+    ex["_n"] = pd.to_numeric(ex["id"], errors="coerce")
+    ex = ex.sort_values("_n")
+    has_key = ex["_k"].notna()
+    dups = ex[has_key & ex.duplicated("_k", keep="first")]
+    extra = ex[has_key & ~ex["_k"].isin(file_keys) & ~ex.index.isin(dups.index)]
+    drop = ["_k", "_n"]
+    return {"dups": dups.drop(columns=drop), "extra": extra.drop(columns=drop), "no_key": no_key}

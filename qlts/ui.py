@@ -247,3 +247,62 @@ def bienban_downloads(docs, file_stem: str, key: str, formats=("pdf", "xlsx", "d
         col.download_button(label, data=lambda fn=fn: fn(docs), file_name=f"{file_stem}.{fmt}", mime=mime,
                             icon=icon, key=f"{key}_{fmt}", width="stretch", on_click="ignore",
                             type="primary" if fmt == formats[0] else "secondary")
+
+
+def reconcile_panel(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, key: str) -> None:
+    """Đối chiếu file tải lên với SharePoint: tìm bản ghi trùng / thừa và cho xóa (có hỏi xác nhận)."""
+    from . import excel_io
+
+    rec = excel_io.reconcile(list_key, data, existing)
+    dups, extra = rec["dups"], rec["extra"]
+    keys = excel_io.MATCH_KEYS[list_key]
+    if not keys:
+        return
+    labels = schema.labels_of(list_key)
+    show_cols = [c for c in [*keys, "TenThietBi", "TenPhong", "HoTen", "NoiSuDung", "DacDiem"]
+                 if c in existing.columns][:5]
+    diff = len(existing) - len(data)
+    title = (f"Đối chiếu với SharePoint – file {len(data)} dòng, SharePoint {len(existing)} dòng"
+             + (f" (SharePoint nhiều hơn {diff})" if diff > 0 else ""))
+    with st.expander(title, expanded=bool(len(dups) or (diff > 0 and len(extra)))):
+        if rec["no_key"]:
+            st.warning(f"File có **{rec['no_key']}** dòng không có {' + '.join(labels[k] for k in keys)}: "
+                       "mỗi lần nhập các dòng này sẽ được **tạo mới** (dễ bị nhân đôi). Nên điền khóa cho các dòng "
+                       "này (hoặc tải 'Dữ liệu hiện có' về để lấy mã đã sinh).")
+        if dups.empty and extra.empty:
+            st.success("SharePoint khớp với file: không có bản ghi trùng hay thừa.")
+        if not dups.empty:
+            st.markdown(f"**{len(dups)} bản ghi TRÙNG** trên SharePoint (cùng "
+                        f"{' + '.join(labels[k] for k in keys)} với một bản ghi khác – thường do lần nhập trước "
+                        "bị gián đoạn rồi nhập lại). App giữ bản tạo sớm nhất, đề xuất xóa các bản sau:")
+            st.dataframe(dups[["id", *show_cols]].rename(columns=labels), hide_index=True, width="stretch",
+                         height=min(400, 38 + 35 * len(dups)))
+            if st.button(f"Xóa {len(dups)} bản trùng", key=f"{key}_deldup", icon=":material/delete_sweep:"):
+                ids = list(dups["id"])
+                confirm_dialog(
+                    "Xóa bản ghi trùng", f"Xóa **{len(ids)} bản ghi trùng** khỏi SharePoint (giữ lại bản gốc)?",
+                    lambda: _delete_ids(list_key, ids),
+                    details=[" / ".join(str(r[c]) for c in show_cols) for _, r in dups.iterrows()],
+                )
+        if not extra.empty:
+            st.markdown(f"**{len(extra)} bản ghi có trên SharePoint nhưng không có trong file.** "
+                        "Tick những dòng muốn xóa (nếu file của bạn là danh sách đầy đủ):")
+            ev = st.dataframe(extra[["id", *show_cols]].rename(columns=labels), hide_index=True, width="stretch",
+                              on_select="rerun", selection_mode="multi-row", key=f"{key}_extra",
+                              height=min(400, 38 + 35 * len(extra)))
+            picked = extra.iloc[ev.selection.rows]
+            if st.button(f"Xóa {len(picked)} dòng đã chọn", key=f"{key}_delextra", icon=":material/delete:",
+                         disabled=picked.empty):
+                ids = list(picked["id"])
+                confirm_dialog(
+                    "Xóa bản ghi không có trong file", f"Xóa **{len(ids)} bản ghi** khỏi SharePoint?",
+                    lambda: _delete_ids(list_key, ids),
+                    details=[" / ".join(str(r[c]) for c in show_cols) for _, r in picked.iterrows()],
+                )
+
+
+def _delete_ids(list_key: str, ids: list[str]) -> str | None:
+    errors = storage.batch(list_key, [("delete", i) for i in ids])
+    if errors:
+        return f"Có {len(errors)} lỗi khi xóa:\n\n" + "\n\n".join(errors[:10])
+    flash(f"Đã xóa {len(ids)} bản ghi khỏi SharePoint.")

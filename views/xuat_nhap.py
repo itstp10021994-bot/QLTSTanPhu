@@ -119,6 +119,8 @@ if plan["problems"]:
             st.write("•", p)
 st.caption("Chỉ những ô **khác** với dữ liệu hiện có mới được ghi đè; ô trống trong file không xóa dữ liệu đang có.")
 
+ui.reconcile_panel(list_key, rows, storage.load(list_key), key=f"xn_rec_{list_key}")
+
 target = "dữ liệu DEMO (không lên SharePoint)" if storage.is_demo() else "SharePoint"
 if st.button(f"Nhập {len(plan['ops'])} dòng vào {target}", type="primary", icon=":material/upload:",
              disabled=not plan["ops"]):
