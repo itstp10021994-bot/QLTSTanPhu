@@ -528,25 +528,58 @@ class BridgeStore(SharePointStore):
             candidates = [self.list_names[list_name]]
         else:
             candidates = [schema.LISTS[list_name]["sp_list"], *schema.LISTS[list_name].get("aliases", [])]
-        lists = self._lists_index()
-        for cand in candidates:
-            wanted = _normalize(cand)
-            for lst in lists:
-                url = (lst.get("RootFolder") or {}).get("ServerRelativeUrl", "")
-                url_name = requests.utils.unquote(url.rstrip("/").split("/")[-1])
-                if wanted in (_normalize(lst.get("Title", "")), _normalize(url_name)):
-                    self._list_ids[list_name] = lst["Id"]
-                    self._resolved_names[list_name] = lst.get("Title") or cand
-                    self.list_web_urls[self._resolved_names[list_name]] = url
-                    return lst["Id"]
-        raise StorageError(f"Không tìm thấy list “{' / '.join(candidates)}” trên site của flow.")
+        for attempt in range(2):
+            lists = self._lists_index()
+            for cand in candidates:
+                wanted = _normalize(cand)
+                for lst in lists:
+                    url = (lst.get("RootFolder") or {}).get("ServerRelativeUrl", "")
+                    url_name = requests.utils.unquote(url.rstrip("/").split("/")[-1])
+                    if wanted in (_normalize(lst.get("Title", "")), _normalize(url_name)):
+                        self._list_ids[list_name] = lst["Id"]
+                        self._resolved_names[list_name] = lst.get("Title") or cand
+                        self.list_web_urls[self._resolved_names[list_name]] = url
+                        return lst["Id"]
+            # List vừa tạo sau lần đọc danh sách trước -> đọc lại danh sách list một lần
+            if attempt == 0 and self._index and time.time() - self._index[0] > 20:
+                self._index = None
+                continue
+            break
+        names = sorted(lst.get("Title", "") for lst in lists if lst.get("BaseTemplate", 100) == 100)
+        raise StorageError(f"Không tìm thấy list “{' / '.join(candidates)}” trên site của flow. "
+                           f"Các list đang có: {', '.join(names[:30]) or '(không có)'}.")
+
+    def create_list(self, list_key: str) -> str:
+        """Tạo list còn thiếu (qua flow, bằng quyền chủ flow) với đủ cột theo schema; trả về tên list."""
+        from html import escape
+
+        spec = schema.LISTS[list_key]
+        name = self.list_names.get(list_key) or spec["sp_list"]
+        created = self.rest("POST", "_api/web/lists", {"Title": name, "BaseTemplate": 100,
+                                                        "Description": "Tạo bởi ứng dụng quản lý thiết bị"})
+        guid = created.get("Id") or created.get("id")
+        if not guid:
+            raise StorageError(f"Không tạo được list {name}: {str(created)[:300]}")
+        base = f"_api/web/lists(guid'{guid}')"
+        kinds = {"text": "Type='Text'", "choice": "Type='Text'", "note": "Type='Note' NumLines='6'",
+                 "number": "Type='Number'", "date": "Type='DateTime' Format='DateOnly'"}
+        for key, col in spec["columns"].items():
+            label = escape(col["label"], quote=True)
+            if key == "Title":
+                self.rest("PATCH", f"{base}/fields/getbyinternalnameortitle('Title')", {"Title": col["label"]})
+                continue
+            xml = f"<Field {kinds[col['type']]} DisplayName='{label}' Name='{key}' StaticName='{key}' />"
+            # 8 = giữ tên nội bộ theo Name, 16 = thêm vào view mặc định, 1 = thêm vào content type mặc định
+            self.rest("POST", f"{base}/fields/createfieldasxml", {"parameters": {"SchemaXml": xml, "Options": 25}})
+        self.forget_schema()
+        return name
 
     def _lists_index(self) -> list[dict]:
         """Danh sách các list của site – gọi flow MỘT lần rồi dùng lại cho mọi list."""
         with self._index_lock:
             if self._index and time.time() - self._index[0] < COLUMNS_TTL:
                 return self._index[1]
-            data = self.rest("GET", "_api/web/lists?$select=Id,Title,Hidden,RootFolder/ServerRelativeUrl"
+            data = self.rest("GET", "_api/web/lists?$select=Id,Title,Hidden,BaseTemplate,RootFolder/ServerRelativeUrl"
                                     "&$expand=RootFolder&$filter=Hidden eq false")
             self._index = (time.time(), data.get("value", []))
             return self._index[1]

@@ -34,6 +34,16 @@ if history_error:
         "Chưa có list thì app vẫn chuyển tình trạng thiết bị nhưng không lưu được danh sách theo đợt.",
         icon=":material/playlist_remove:",
     )
+    st.caption(f"Chi tiết: {history_error}")
+    if storage.is_bridge() and user.is_admin and st.button("Tạo list ThanhLy tự động", icon=":material/build:"):
+        try:
+            with st.spinner("Đang tạo list ThanhLy trên SharePoint..."):
+                name = storage.get_store().create_list(schema.THANH_LY)
+            storage.refresh(schema_too=True)
+            ui.flash(f"Đã tạo list {name} trên SharePoint.")
+            st.rerun()
+        except storage.StorageError as exc:
+            st.error(f"Không tạo được list: {exc}")
 
 
 def round_items(rows: pd.DataFrame) -> pd.DataFrame:

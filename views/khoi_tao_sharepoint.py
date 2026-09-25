@@ -59,8 +59,28 @@ if st.button("Kiểm tra", icon=":material/fact_check:"):
 
 st.markdown("##### 2. Tạo các list còn thiếu")
 if storage.is_bridge():
-    st.info("Ở chế độ Power Automate, hãy tạo list trên SharePoint bằng các file biểu mẫu "
-            "(Phân quyền → Xuất / nhập biểu mẫu → Tất cả biểu mẫu), rồi bấm Kiểm tra ở trên.")
+    missing = []
+    for k in schema.LISTS:
+        try:
+            store.list_id(k)
+        except storage.StorageError:
+            missing.append(k)
+    if not missing:
+        st.success("Site đã có đủ các list app cần.")
+        st.stop()
+    st.write("Các list còn thiếu: " + ", ".join(f"**{schema.LISTS[k]['sp_list']}**" for k in missing))
+    st.caption("App tạo list qua flow Power Automate (bằng quyền của chủ flow), đủ cột theo biểu mẫu. "
+               "Hoặc tự tạo trên SharePoint từ file biểu mẫu (Phân quyền → Xuất / nhập biểu mẫu).")
+    creatable = [k for k in missing if k != schema.THIET_BI]
+    if st.button(f"Tạo {len(creatable)} list còn thiếu", type="primary", icon=":material/build:",
+                 disabled=not creatable):
+        for k in creatable:
+            try:
+                with st.spinner(f"Đang tạo list {schema.LISTS[k]['sp_list']}..."):
+                    st.write("✅ Đã tạo list", store.create_list(k))
+            except storage.StorageError as exc:
+                st.error(f"Không tạo được list {schema.LISTS[k]['sp_list']}: {exc}")
+        storage.refresh(schema_too=True)
     st.stop()
 st.write(
     "Tạo các list ứng dụng cần mà site chưa có (Phong, DieuChuyen, KiemKe, PhanQuyen...). "
