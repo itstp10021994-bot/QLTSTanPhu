@@ -35,7 +35,7 @@ def page(path: str, title: str, icon: str) -> st.Page:
 
 
 home = st.Page("views/home.py", title="Trang chủ", icon=":material/home:", default=True)
-sections: dict[str, list[st.Page]] = {"": [home]}
+sections: dict[str, list[st.Page]] = {"": [home, page("tra_cuu.py", "Trợ lý tra cứu", ":material/manage_search:")]}
 
 if user.has_any(ROLE_QLTS):
     sections["Ban quản lý tài sản"] = [
