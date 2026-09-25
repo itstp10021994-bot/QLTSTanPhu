@@ -29,6 +29,9 @@ COLUMNS = [
 LABELS = {k: label for k, label, _ in COLUMNS}
 
 
+NO_PLACE = "(Chưa có vị trí)"
+
+
 def school_year(d: date) -> str:
     start = d.year if d.month >= 8 else d.year - 1
     return f"{start}-{start + 1}"
@@ -55,7 +58,7 @@ def group_assets(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=cols)
     w = pd.DataFrame({
-        "vi_tri": df["NoiSuDung"].str.strip(),
+        "vi_tri": df["NoiSuDung"].str.strip().replace("", NO_PLACE),
         "nhom": df["NhomThietBi"].str.strip(),
         "ma": df["MaTaiSan"].str.strip(),
         "ten": df["TenThietBi"].where(df["TenThietBi"].str.strip() != "", df["ChiTiet"]).str.strip(),

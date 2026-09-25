@@ -13,7 +13,9 @@ st.subheader("Bàn giao tài sản")
 tb = storage.load(schema.THIET_BI)
 labels = ui.room_label_map()
 managers = thietbi.room_managers()
-active = tb[(tb["NoiSuDung"] != "") & ~thietbi.is_disposed(tb)]
+disposed = thietbi.is_disposed(tb)
+in_use = tb[~disposed]  # tất cả thiết bị đang sử dụng (kể cả chưa có vị trí) – dùng cho tab xem
+active = in_use[in_use["NoiSuDung"] != ""]  # lập biên bản: cần có phòng
 rooms = [r for r in labels if r in set(active["NoiSuDung"])]
 fmt_room = lambda r: labels.get(r, r)  # noqa: E731
 
@@ -33,8 +35,8 @@ with tab_view:
     c1, c2, c3 = st.columns([2, 1.5, 1.5])
     kw = c1.text_input("Tìm kiếm (mã, tên, quy cách, người sử dụng...)", key="bgv_kw")
     sel_rooms = c2.multiselect("Vị trí tài sản", rooms, format_func=fmt_room, key="bgv_rooms")
-    sel_groups = c3.multiselect("Nhóm tài sản", sorted(set(active["NhomThietBi"]) - {""}), key="bgv_groups")
-    data = active
+    sel_groups = c3.multiselect("Nhóm tài sản", sorted(set(in_use["NhomThietBi"]) - {""}), key="bgv_groups")
+    data = in_use
     if sel_rooms:
         data = data[data["NoiSuDung"].isin(sel_rooms)]
     if sel_groups:
@@ -44,10 +46,26 @@ with tab_view:
         mask = g[["ma", "ten", "quy_cach", "nguoi", "nhom", "vi_tri"]].apply(
             lambda col: col.str.contains(kw, case=False, regex=False)).any(axis=1)
         g = g[mask].reset_index(drop=True)
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Số dòng (sau khi gom)", f"{len(g):,}".replace(",", "."))
-    m2.metric("Tổng số lượng", f"{g['sl'].sum():,.0f}".replace(",", "."))
-    m3.metric("Số vị trí", g["vi_tri"].nunique())
+    fmt_n = lambda v: f"{v:,.0f}".replace(",", ".")  # noqa: E731
+    sl_raw = pd.to_numeric(data["SL"], errors="coerce").fillna(0)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Số thiết bị (dòng trên SharePoint)", fmt_n(len(data)))
+    m2.metric("Tổng số lượng", fmt_n(g["sl"].sum()), help="Cộng cột SL; dòng SL trống hoặc 0 tính là 1.")
+    m3.metric("Số dòng sau khi gom", fmt_n(len(g)))
+    m4.metric("Số vị trí", g["vi_tri"].nunique())
+    if not (sel_rooms or sel_groups or kw):
+        no_place = int((in_use["NoiSuDung"] == "").sum())
+        with st.expander("Đối chiếu với tổng số trên SharePoint"):
+            st.markdown(
+                f"- Tổng số dòng trong list thiết bị: **{fmt_n(len(tb))}**\n"
+                f"- Trừ tài sản **đã thanh lý** (không hiển thị ở đây): **{fmt_n(int(disposed.sum()))}**\n"
+                f"- Còn lại đang sử dụng: **{fmt_n(len(in_use))}** dòng"
+                + (f" – trong đó **{fmt_n(no_place)}** dòng chưa có Nơi sử dụng (nhóm "
+                   f"“{bangiao.NO_PLACE}”, không lập được biên bản bàn giao)" if no_place else "") + "\n"
+                f"- Dòng có SL lớn hơn 1: **{fmt_n(int((sl_raw > 1).sum()))}** (thêm "
+                f"{fmt_n((sl_raw[sl_raw > 1] - 1).sum())} vào tổng số lượng); dòng SL trống/0 (tính là 1): "
+                f"**{fmt_n(int((sl_raw <= 0).sum()))}**"
+            )
     table = view_frame(g)
     st.dataframe(table, hide_index=True, width="stretch", height=560,
                  column_config={"Số lượng": st.column_config.NumberColumn(format="localized")})
