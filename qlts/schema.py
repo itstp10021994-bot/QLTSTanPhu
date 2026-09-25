@@ -40,6 +40,7 @@ DIEU_CHUYEN = "DieuChuyen"
 KIEM_KE = "KiemKe"
 PHAN_QUYEN = "PhanQuyen"
 LOAI_TB = "LoaiThietBi"
+THANH_LY = "ThanhLy"
 
 # Mỗi list:
 #   sp_list: tên list mặc định trên SharePoint (đổi được trong secrets [sharepoint.lists])
@@ -149,6 +150,30 @@ LISTS: dict[str, dict] = {
             "MaPhanLoai": {"type": "text", "label": "Mã phân loại tài sản",
                            "alt": ["Mã phân loại", "Mã phân loại TS", "Mã tài sản", "Mã loại"]},
             "NhomThietBi": {"type": "text", "label": "Nhóm thiết bị"},
+        },
+    },
+    # Lịch sử thanh lý: mỗi dòng = một thiết bị trong một đợt thanh lý
+    THANH_LY: {
+        "sp_list": "ThanhLy",
+        "aliases": ["7_ThanhLy"],  # tên khi tạo list từ file biểu mẫu
+        "columns": {
+            "Title": {"type": "text", "label": "Mã chi tiết", "sp": "Title"},
+            "DotThanhLy": {"type": "text", "label": "Đợt thanh lý"},
+            "SoToTrinh": {"type": "text", "label": "Số tờ trình"},
+            "NgayThanhLy": {"type": "date", "label": "Ngày thanh lý"},
+            "MaTaiSan": {"type": "text", "label": "Mã tài sản"},
+            "TenThietBi": {"type": "text", "label": "Tên tài sản"},
+            "DacDiem": {"type": "text", "label": "Đặc điểm"},
+            "DVT": {"type": "text", "label": "ĐVT"},
+            "SoLuong": {"type": "number", "label": "Số lượng"},
+            "NamMua": {"type": "text", "label": "Ngày mua"},
+            "GiaMua": {"type": "number", "label": "Giá mua mới"},
+            "GiaTriConLai": {"type": "number", "label": "Giá trị còn lại"},
+            "NoiSuDung": {"type": "text", "label": "Đơn vị sử dụng"},
+            "TinhTrang": {"type": "text", "label": "Tình trạng"},
+            "DuKien": {"type": "text", "label": "Dự kiến thời gian thanh lý"},
+            "GhiChu": {"type": "note", "label": "Ghi chú"},
+            "NguoiThucHien": {"type": "text", "label": "Người thực hiện"},
         },
     },
 }

@@ -16,7 +16,7 @@ with st.container(border=True):
 
 tb = storage.load(schema.THIET_BI)
 my_rooms = thietbi.rooms_managed_by(user.email)
-my_tb = tb[tb["NoiSuDung"].isin(my_rooms)]
+my_tb = thietbi.active(tb)[lambda d: d["NoiSuDung"].isin(my_rooms)]
 
 st.write("")
 m1, m2, m3 = st.columns(3)

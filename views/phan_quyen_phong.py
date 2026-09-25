@@ -89,7 +89,7 @@ if c1.button("Thêm phòng", icon=":material/add:", width="stretch"):
     add_dialog()
 kw = c2.text_input("Tìm", placeholder="Tìm theo mã phòng, tên phòng, người quản lý...", label_visibility="collapsed")
 view = phong[["id", "Title", "TenPhong", "NguoiQuanLy", "TenNguoiQuanLy"]].sort_values("Title").copy()
-view["SoTB"] = view["Title"].map(tb.groupby("NoiSuDung").size()).fillna(0).astype(int)
+view["SoTB"] = view["Title"].map(thietbi.active(tb).groupby("NoiSuDung").size()).fillna(0).astype(int)
 if kw:
     view = view[view.drop(columns=["id", "SoTB"]).apply(lambda r: kw.lower() in " ".join(r).lower(), axis=1)]
 view = view.reset_index(drop=True)

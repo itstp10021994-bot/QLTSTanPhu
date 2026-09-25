@@ -14,7 +14,7 @@ rooms = list(labels)
 fmt = lambda r: labels.get(r, r)  # noqa: E731
 
 tu_phong = st.selectbox("Từ nơi sử dụng", rooms, format_func=fmt, key="dc_from")
-in_room = tb[(tb["NoiSuDung"] == tu_phong)].reset_index(drop=True)
+in_room = thietbi.active(tb)[lambda d: d["NoiSuDung"] == tu_phong].reset_index(drop=True)
 chosen = in_room.iloc[0:0]
 if in_room.empty:
     st.info("Nơi này không có thiết bị.")

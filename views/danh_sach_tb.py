@@ -47,7 +47,9 @@ tab_edit, tab_import = st.tabs(["Xem & sửa", "Nhập / xuất Excel"])
 
 # ---------------------------------------------------------------------------
 with tab_edit:
-    filtered = ui.equipment_filters(tb, "ds")
+    show_all = st.toggle("Hiện cả tài sản đã thanh lý", key="ds_all",
+                         help="Mặc định ẩn các tài sản đã thanh lý (xem ở mục Thanh lý tài sản).")
+    filtered = ui.equipment_filters(tb if show_all else thietbi.active(tb), "ds")
     shown = st.multiselect("Cột hiển thị", all_cols, default=DEFAULT_COLS, format_func=labels.get, key="ds_cols")
     shown = ["MaTaiSan", "MaChiTiet", *[c for c in shown if c not in ("MaTaiSan", "MaChiTiet")]]
     initial = to_editor(filtered[["id", *shown]]).reset_index(drop=True)

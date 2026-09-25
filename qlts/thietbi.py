@@ -30,6 +30,11 @@ def is_disposed(df: pd.DataFrame) -> pd.Series:
     return df["TinhTrang"].isin(done) | (df["NoiSuDung"] == schema.NOI_THANH_LY)
 
 
+def active(df: pd.DataFrame) -> pd.DataFrame:
+    """Thiết bị còn sử dụng (ẩn tài sản đã thanh lý khỏi các màn hình chung)."""
+    return df[~is_disposed(df)]
+
+
 def needs_attention(df: pd.DataFrame) -> pd.Series:
     return ~df["TinhTrang"].isin(schema.TINH_TRANG_TOT | {""}) & ~is_disposed(df)
 

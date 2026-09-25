@@ -12,7 +12,7 @@ if not rooms:
 
 labels = ui.room_label_map()
 tb = storage.load(schema.THIET_BI)
-mine = tb[tb["NoiSuDung"].isin(rooms)]
+mine = thietbi.active(tb)[lambda d: d["NoiSuDung"].isin(rooms)]  # ẩn tài sản đã thanh lý
 attention = thietbi.needs_attention(mine)
 
 m1, m2, m3 = st.columns(3)

@@ -111,7 +111,7 @@ Bấm **Lưu**. Mở lại trigger **When an HTTP request is received** → copy
 ## Bước 6 – Tạo các list (nếu chưa có)
 
 Trên site QLTSTanPhu tạo 5 list từ file biểu mẫu: `1_ThietBi`, `2_Phong`, `3_DieuChuyen`, `4_KiemKe`,
-`5_PhanQuyen` (app tự nhận các tên này). Nhớ **xóa dòng mẫu**.
+`5_PhanQuyen`, `7_ThanhLy` (lịch sử thanh lý theo đợt) – app tự nhận các tên này. Nhớ **xóa dòng mẫu**.
 
 ## Bước 7 – Điền Secrets trên Streamlit
 

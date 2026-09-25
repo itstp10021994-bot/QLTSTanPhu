@@ -49,6 +49,13 @@ SAMPLES = {
         "DotKiemKe": "Đợt 2 năm 2024 - 2025", "NguoiKiemKe": "kiemke@truong.edu.vn", "NguoiXacNhan": "",
     },
     schema.LOAI_TB: {"TenThietBi": "Màn hình LED", "MaPhanLoai": "111305", "NhomThietBi": "Nhóm Công Nghệ Thông Tin"},
+    schema.THANH_LY: {
+        "Title": "111028-00012", "DotThanhLy": "Đợt 1 – 2026 - 2027", "SoToTrinh": "491",
+        "NgayThanhLy": date(2026, 9, 18), "MaTaiSan": "111028", "TenThietBi": "Máy chiếu", "DacDiem": "Epson",
+        "DVT": "Cái", "SoLuong": 1, "NamMua": "2016", "GiaMua": 16000000, "GiaTriConLai": 0,
+        "NoiSuDung": "Phòng 208", "TinhTrang": "Hư hỏng, xuống cấp nặng", "DuKien": "Tháng 9/2026",
+        "GhiChu": "Bán phế liệu", "NguoiThucHien": "qlts@truong.edu.vn",
+    },
     schema.PHAN_QUYEN: {
         "Title": "email_cua_ban@truong.edu.vn", "HoTen": "Lê Thiên An", "VaiTro": schema.ROLE_ADMIN,
         "ChucDanh": "Chuyên viên Quản lý hệ thống",
@@ -67,6 +74,7 @@ NOTES = {
     "NguoiKiemKe": "Không bắt buộc – có cột thì app ghi email người kiểm kê",
     "NguoiXacNhan": "Không bắt buộc – có cột thì app ghi email người xác nhận",
     "MaPhanLoai": "Mã tài sản của loại thiết bị – chọn tên khi nhập mới, app tự điền mã này",
+    "DotThanhLy": "Tên đợt, vd 'Đợt 1 – 2026 - 2027' (app ghi khi bấm Xác nhận thanh lý)",
     "Title": "",
 }
 
@@ -77,6 +85,7 @@ LIST_TITLES = {
     schema.KIEM_KE: "Kiểm kê",
     schema.PHAN_QUYEN: "Phân quyền",
     schema.LOAI_TB: "Danh mục loại thiết bị",
+    schema.THANH_LY: "Lịch sử thanh lý (theo đợt)",
 }
 
 FILES = {
@@ -86,6 +95,7 @@ FILES = {
     schema.KIEM_KE: ("4_KiemKe.xlsx", "Data_Thietbi"),
     schema.PHAN_QUYEN: ("5_PhanQuyen.xlsx", "PhanQuyen"),
     schema.LOAI_TB: ("6_LoaiThietBi.xlsx", "Data_Loaithietbi"),
+    schema.THANH_LY: ("7_ThanhLy.xlsx", "ThanhLy"),
 }
 
 
@@ -207,6 +217,7 @@ MATCH_KEYS = {
     schema.KIEM_KE: ["DotKiemKe", "NoiSuDung", "MaTaiSan", "DacDiem"],
     schema.DIEU_CHUYEN: [],  # lịch sử: luôn thêm mới
     schema.LOAI_TB: ["MaPhanLoai"],
+    schema.THANH_LY: ["DotThanhLy", "Title"],
 }
 
 
@@ -225,6 +236,7 @@ REQUIRED = {
     schema.DIEU_CHUYEN: ["Title"],
     schema.THIET_BI: [],  # kiểm tra riêng (cần Mã tài sản hoặc Mã chi tiết)
     schema.LOAI_TB: ["MaPhanLoai", "TenThietBi"],
+    schema.THANH_LY: ["Title", "DotThanhLy"],
 }
 
 
