@@ -148,6 +148,12 @@ key = "<mã bí mật ở bước 1>"
   Nếu sửa dữ liệu trực tiếp trên SharePoint, bấm **Làm mới** ở thanh bên để app thấy ngay. Gói Premium cho phép hàng chục nghìn lần chạy mỗi ngày – đủ dùng.
 - Nếu flow bị tắt, hết hạn Premium, hoặc bạn đổi mật khẩu làm hỏng kết nối SharePoint/Outlook trong flow, app sẽ
   báo lỗi kết nối – vào flow sửa kết nối (Connections) là chạy lại.
+- **Nhập nhiều dòng bị chậm / Power Automate gửi mail "flow(s) have failed":** mỗi dòng ghi là 1 lần chạy flow;
+  dòng nào SharePoint từ chối (sai kiểu dữ liệu, cột không tồn tại...) thì lần chạy đó bị đánh dấu *Failed* – app
+  vẫn nhận lỗi và liệt kê ở cuối. Mở **Run history** của flow, bấm vào lần chạy Failed, xem bước
+  *Send an HTTP request to SharePoint* để biết lý do. Để flow không treo lâu khi SharePoint bận: bấm **…** của bước
+  *Send an HTTP request to SharePoint* → **Settings** → **Retry policy** chọn **None** (app tự thử lại khi bị giới
+  hạn tốc độ). Nếu lỗi liên tiếp 10 dòng, app tự dừng; sửa xong nhập lại file – các dòng đã ghi được bỏ qua.
 - Lỗi thường gặp trên trang Kết nối SharePoint:
   - `403 … key` → key trong Secrets khác key trong flow (bước 3).
   - `404 Không tìm thấy list` → sai tên list hoặc site ở bước "Send an HTTP request to SharePoint".

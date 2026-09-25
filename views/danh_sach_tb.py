@@ -100,7 +100,8 @@ with tab_edit:
 
     def save_all() -> str | None:
         bar = st.progress(0.0, text="Đang lưu lên SharePoint...")
-        errors = storage.batch(TB, ops, progress=lambda f: bar.progress(f, text="Đang lưu lên SharePoint..."))
+        errors = storage.batch(TB, ops,
+                               progress=lambda f, t="": bar.progress(f, text=f"Đang lưu lên SharePoint... {t}"))
         bar.empty()
         st.session_state["ds_version"] = version + 1
         if errors:
@@ -152,17 +153,24 @@ with tab_import:
         if unknown:
             st.warning("Bỏ qua các cột không nhận ra: " + ", ".join(unknown))
         st.dataframe(data.head(20).astype(object).fillna("").rename(columns=labels), hide_index=True, width="stretch")
-        plan = excel_io.plan_import(TB, data, tb, update_existing=True, user_name=user.name, managers=managers)
+        plan = excel_io.plan_import(TB, data, tb, update_existing=True, user_name=user.name, managers=managers,
+                                    writable=storage.writable_columns(TB))
         st.info(f"Sẽ thêm mới **{plan['create']}** thiết bị, cập nhật **{plan['update']}** thiết bị có thay đổi; "
                 f"**{plan['same']}** thiết bị giống hệt dữ liệu hiện có sẽ bỏ qua.")
         if plan["changes"]:
             with st.expander(f"Xem {len(plan['changes'])} ô sẽ được ghi đè"):
                 st.dataframe(plan["changes"], hide_index=True, width="stretch")
+        _w = storage.writable_columns(TB)
+        _skip = [c for c in data.columns if _w is not None and c not in _w]
+        if _skip:
+            st.warning("Các cột sau không có (hoặc chỉ đọc) trên SharePoint nên sẽ không được ghi: "
+                       + ", ".join(schema.labels_of(TB).get(c, c) for c in _skip))
         for p in plan["problems"][:20]:
             st.error(p)
         if st.button("Nhập vào SharePoint", type="primary", icon=":material/upload:", disabled=not plan["ops"]):
             bar = st.progress(0.0, text="Đang nhập...")
-            errors = storage.batch(TB, plan["ops"], progress=lambda f: bar.progress(f, text="Đang nhập..."))
+            errors = storage.batch(TB, plan["ops"],
+                                   progress=lambda f, t="": bar.progress(f, text=f"Đang nhập... {t}"))
             bar.empty()
             if errors:
                 st.error(f"Có {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:20]))

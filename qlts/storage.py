@@ -394,7 +394,8 @@ class SharePointStore:
                         msg = (resp.get("body") or {}).get("error", {}).get("message", "")
                         errors.append(f"Dòng {int(resp['id']) + 1}: lỗi {status} {msg}")
                 if progress:
-                    progress(min(1.0, (start + len(chunk)) / max(len(pending), 1)))
+                    done = min(len(pending), start + len(chunk))
+                    progress(done / max(len(pending), 1), f"{done}/{len(pending)} dòng · {len(errors)} lỗi")
             if not retry:
                 break
             time.sleep(2 ** attempt)
@@ -446,6 +447,7 @@ class BridgeStore(SharePointStore):
     """
 
     PARALLEL = 6  # số yêu cầu gửi đồng thời khi ghi hàng loạt
+    STOP_AFTER = 10  # dừng ghi hàng loạt sau chừng này lỗi liên tiếp
 
     def __init__(self, cfg: dict):
         super().__init__(cfg, token_provider=lambda: "")
@@ -457,13 +459,29 @@ class BridgeStore(SharePointStore):
     # -- gọi flow --
     def _call(self, payload: dict, timeout: int = 120):
         body = {"key": self.key, **payload}
+        write = payload.get("method") in ("POST", "PATCH", "DELETE", "MERGE")
+        timed_out = 0
         for attempt in range(4):
             try:
-                resp = requests.post(self.flow_url, json=body, timeout=timeout)
+                resp = requests.post(self.flow_url, json=body, timeout=90 if write else timeout)
+            except requests.Timeout as exc:
+                raise StorageError("flow Power Automate không phản hồi (quá thời gian chờ) – xem lịch sử chạy "
+                                   "(Run history) của flow để biết bước nào bị treo.") from exc
             except requests.RequestException as exc:
                 raise StorageError(f"Không gọi được flow Power Automate: {exc}") from exc
-            if resp.status_code in (429, 502, 503, 504) and attempt < 3:
-                time.sleep(int(resp.headers.get("Retry-After", 2 ** attempt)))
+            if resp.status_code in (502, 504):
+                # Flow quá thời gian / không trả lời: chỉ thử lại 1 lần để không treo lâu
+                timed_out += 1
+                if timed_out < 2 and attempt < 3:
+                    time.sleep(2)
+                    continue
+                break
+            if resp.status_code in (429, 503) and attempt < 3:  # bị giới hạn tốc độ: chờ rồi thử lại
+                try:
+                    wait = int(resp.headers.get("Retry-After", 0)) or 2 ** (attempt + 1)
+                except ValueError:
+                    wait = 2 ** (attempt + 1)
+                time.sleep(min(wait, 30))
                 continue
             break
         try:
@@ -472,6 +490,9 @@ class BridgeStore(SharePointStore):
             data = {"raw": resp.text[:500]}
         if resp.status_code >= 400:
             msg = _error_text(data)
+            if resp.status_code in (502, 504) and not msg:
+                msg = ("flow không trả lời kịp (quá thời gian) – mở Run history của flow QLTB-API để xem bước "
+                       "'Send an HTTP request to SharePoint' báo lỗi gì.")
             if resp.status_code == 403 and (not msg or msg == "forbidden"):
                 msg = "flow từ chối – kiểm tra `key` trong Secrets trùng với mã trong flow."
             raise StorageError(f"SharePoint (qua Power Automate) lỗi {resp.status_code}: {msg or str(data)[:300]}")
@@ -586,17 +607,28 @@ class BridgeStore(SharePointStore):
             else:
                 self.delete(list_name, op[1])
 
-        errors, done = [], 0
+        errors, done, streak, stopped = [], 0, 0, False
         with ThreadPoolExecutor(max_workers=self.PARALLEL) as pool:
             futures = {pool.submit(run, op): i for i, op in enumerate(ops)}
             for fut in as_completed(futures):
+                if fut.cancelled():
+                    continue
                 done += 1
                 exc = fut.exception()
                 if exc:
                     errors.append(f"Dòng {futures[fut] + 1}: {exc}")
+                    streak += 1
+                else:
+                    streak = 0
+                if streak >= self.STOP_AFTER and not stopped:
+                    # Lỗi liên tiếp (flow tắt, hết kết nối, sai cột...): dừng thay vì chờ hết mọi dòng
+                    stopped = True
+                    left = sum(f.cancel() for f in futures)
+                    errors.append(f"Đã DỪNG sau {streak} lỗi liên tiếp; {left} dòng chưa ghi. Sửa lỗi rồi nhập lại "
+                                  "(các dòng đã ghi sẽ được nhận là 'không đổi').")
                 if progress:
-                    progress(done / len(ops))
-        return sorted(errors)
+                    progress(done / len(ops), f"{done}/{len(ops)} dòng · {len(errors)} lỗi")
+        return sorted(errors, key=lambda e: (not e.startswith("Đã DỪNG"), e))
 
 
 # ---------------------------------------------------------------------------
@@ -670,7 +702,7 @@ class LocalStore:
             else:
                 self.delete(list_name, op[1])
             if progress:
-                progress((i + 1) / len(ops))
+                progress((i + 1) / len(ops), f"{i + 1}/{len(ops)} dòng")
         return []
 
 
@@ -866,6 +898,17 @@ def delete(list_name: str, item_id: str) -> None:
         get_store().delete(list_name, item_id)
     finally:
         refresh(list_name)
+
+
+def writable_columns(list_name: str) -> set[str] | None:
+    """Các cột app ghi được trên SharePoint (None = không xác định được / chế độ demo: coi như ghi được hết)."""
+    store = get_store()
+    if not hasattr(store, "columns"):
+        return None
+    try:
+        return {k for k, c in store.columns(list_name).items() if not c["readonly"]}
+    except StorageError:
+        return None
 
 
 def batch(list_name: str, ops: list[tuple], progress=None) -> list[str]:

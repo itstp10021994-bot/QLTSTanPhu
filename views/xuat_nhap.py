@@ -97,6 +97,7 @@ update_existing = st.radio(
 plan = excel_io.plan_import(
     list_key, rows, storage.load(list_key), update_existing, user_name=user.name,
     managers=thietbi.room_managers() if list_key == schema.THIET_BI else None,
+    writable=storage.writable_columns(list_key),
 )
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Thêm mới", plan["create"], border=True)
@@ -107,6 +108,11 @@ m4.metric("Lỗi", len(plan["problems"]), border=True)
 if plan["changes"]:
     with st.expander(f"Xem {len(plan['changes'])} ô sẽ được ghi đè ({plan['update']} dòng)"):
         st.dataframe(plan["changes"], hide_index=True, width="stretch")
+_w = storage.writable_columns(list_key)
+_skip = [c for c in rows.columns if _w is not None and c not in _w]
+if _skip:
+    st.warning("Các cột sau không có (hoặc chỉ đọc) trên SharePoint nên sẽ không được ghi: "
+               + ", ".join(schema.labels_of(list_key).get(c, c) for c in _skip))
 if plan["problems"]:
     with st.expander(f"{len(plan['problems'])} dòng lỗi sẽ không được nhập", expanded=True):
         for p in plan["problems"][:100]:
@@ -118,7 +124,7 @@ if st.button(f"Nhập {len(plan['ops'])} dòng vào {target}", type="primary", i
              disabled=not plan["ops"]):
     bar = st.progress(0.0, text="Đang ghi lên SharePoint...")
     errors = storage.batch(list_key, plan["ops"],
-                           progress=lambda f: bar.progress(f, text="Đang ghi lên SharePoint..."))
+                           progress=lambda f, t="": bar.progress(f, text=f"Đang ghi lên SharePoint... {t}"))
     bar.empty()
     if errors:
         st.error(f"Hoàn tất với {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:30]))

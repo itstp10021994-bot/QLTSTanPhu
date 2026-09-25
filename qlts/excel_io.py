@@ -248,7 +248,7 @@ def changed_fields(list_key: str, rec: dict, old: dict) -> dict:
 
 
 def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, update_existing: bool,
-                user_name: str = "", managers: dict | None = None) -> dict:
+                user_name: str = "", managers: dict | None = None, writable: set[str] | None = None) -> dict:
     """Lập danh sách thao tác ghi cho dữ liệu nhập.
 
     Dòng trùng khóa: chỉ ghi các cột thay đổi (dòng giống hệt được bỏ qua). Ô trống không ghi đè.
@@ -290,6 +290,8 @@ def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, updat
                 continue
             old = index[k]
             diff = changed_fields(list_key, rec, old)
+            if writable is not None:  # cột không có trên SharePoint: app không ghi được -> không tính là thay đổi
+                diff = {c: v for c, v in diff.items() if c in writable}
             if not diff:
                 n_same += 1
                 continue
