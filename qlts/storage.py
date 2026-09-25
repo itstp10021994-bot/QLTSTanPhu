@@ -627,7 +627,8 @@ class BridgeStore(SharePointStore):
                     errors.append(f"Đã DỪNG sau {streak} lỗi liên tiếp; {left} dòng chưa ghi. Sửa lỗi rồi nhập lại "
                                   "(các dòng đã ghi sẽ được nhận là 'không đổi').")
                 if progress:
-                    progress(done / len(ops), f"{done}/{len(ops)} dòng · {len(errors)} lỗi")
+                    last = f" – lỗi gần nhất: {errors[-1][:220]}" if errors else ""
+                    progress(done / len(ops), f"{done}/{len(ops)} dòng · {len(errors)} lỗi{last}")
         return sorted(errors, key=lambda e: (not e.startswith("Đã DỪNG"), e))
 
 
