@@ -491,6 +491,9 @@ class BridgeStore(SharePointStore):
             data = {"raw": resp.text[:500]}
         if resp.status_code >= 400:
             msg = _error_text(data)
+            if "trigger is not enabled" in msg or "state 'Disabled'" in msg or "state 'Suspended'" in msg:
+                msg = ("flow QLTB-API đang TẮT. Vào make.powerautomate.com → My flows → QLTB-API → bấm "
+                       "Turn on (Bật), rồi bấm Làm mới trong app. (Chi tiết: " + msg[:200] + ")")
             if resp.status_code in (502, 504) and not msg:
                 msg = ("flow không trả lời kịp (quá thời gian) – mở Run history của flow QLTB-API để xem bước "
                        "'Send an HTTP request to SharePoint' báo lỗi gì.")
