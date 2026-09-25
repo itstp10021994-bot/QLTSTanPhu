@@ -13,7 +13,7 @@ st.subheader("Bàn giao tài sản")
 tb = storage.load(schema.THIET_BI)
 labels = ui.room_label_map()
 managers = thietbi.room_managers()
-active = tb[(tb["NoiSuDung"] != "") & (tb["NoiSuDung"] != schema.NOI_THANH_LY)]
+active = tb[(tb["NoiSuDung"] != "") & ~thietbi.is_disposed(tb)]
 rooms = [r for r in labels if r in set(active["NoiSuDung"])]
 fmt_room = lambda r: labels.get(r, r)  # noqa: E731
 

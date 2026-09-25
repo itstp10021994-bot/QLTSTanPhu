@@ -24,7 +24,10 @@ def next_detail_codes(df: pd.DataFrame, ma_tai_san: str, count: int = 1) -> list
 
 def is_disposed(df: pd.DataFrame) -> pd.Series:
     """Thiết bị đã thanh lý (không còn tính vào tài sản đang sử dụng)."""
-    return df["TinhTrang"].isin(schema.TINH_TRANG_DA_THANH_LY) | (df["NoiSuDung"] == schema.NOI_THANH_LY)
+    from .config import app_setting
+
+    done = schema.TINH_TRANG_DA_THANH_LY | {str(app_setting("thanh_ly_tinh_trang", "Đã thanh lý"))}
+    return df["TinhTrang"].isin(done) | (df["NoiSuDung"] == schema.NOI_THANH_LY)
 
 
 def needs_attention(df: pd.DataFrame) -> pd.Series:
