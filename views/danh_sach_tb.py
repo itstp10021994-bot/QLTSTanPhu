@@ -141,8 +141,9 @@ with tab_import:
 
     st.markdown("##### Nhập từ Excel")
     st.caption(
-        "Dòng đầu là tên cột (như file mẫu). Dòng có **Mã chi tiết đã tồn tại** sẽ được cập nhật; dòng mới "
-        "để trống Mã chi tiết thì app tự sinh theo Mã tài sản. Ô trống không ghi đè dữ liệu đang có."
+        "Dòng đầu là tên cột (như file mẫu). Dòng có **Mã chi tiết đã tồn tại** được ghi đè – chỉ những ô khác "
+        "dữ liệu hiện có mới được cập nhật; dòng mới (để trống Mã chi tiết thì app tự sinh theo Mã tài sản) được "
+        "thêm vào. Ô trống không xóa dữ liệu đang có."
     )
     upload = st.file_uploader("Chọn file .xlsx hoặc .csv", type=["xlsx", "csv"], key=f"ds_upload_{version}")
     if upload is not None:
@@ -152,7 +153,11 @@ with tab_import:
             st.warning("Bỏ qua các cột không nhận ra: " + ", ".join(unknown))
         st.dataframe(data.head(20).astype(object).fillna("").rename(columns=labels), hide_index=True, width="stretch")
         plan = excel_io.plan_import(TB, data, tb, update_existing=True, user_name=user.name, managers=managers)
-        st.info(f"Sẽ cập nhật **{plan['update']}** thiết bị và thêm mới **{plan['create']}** thiết bị.")
+        st.info(f"Sẽ thêm mới **{plan['create']}** thiết bị, cập nhật **{plan['update']}** thiết bị có thay đổi; "
+                f"**{plan['same']}** thiết bị giống hệt dữ liệu hiện có sẽ bỏ qua.")
+        if plan["changes"]:
+            with st.expander(f"Xem {len(plan['changes'])} ô sẽ được ghi đè"):
+                st.dataframe(plan["changes"], hide_index=True, width="stretch")
         for p in plan["problems"][:20]:
             st.error(p)
         if st.button("Nhập vào SharePoint", type="primary", icon=":material/upload:", disabled=not plan["ops"]):

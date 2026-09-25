@@ -228,11 +228,31 @@ REQUIRED = {
 }
 
 
+def _same_value(kind: str, new, old) -> bool:
+    """So giá trị trong file với giá trị đang có trên SharePoint (đã chuẩn hóa bởi storage)."""
+    if kind == "number":
+        try:
+            return abs(float(new) - float(old or 0)) < 1e-9
+        except (TypeError, ValueError):
+            return False
+    if kind == "date":
+        new = new.isoformat() if isinstance(new, date) else str(new).strip()
+        return new == str(old or "").strip()
+    return str(new).strip() == str(old if old is not None else "").strip()
+
+
+def changed_fields(list_key: str, rec: dict, old: dict) -> dict:
+    """Chỉ giữ các cột có giá trị khác với dữ liệu hiện có."""
+    return {k: v for k, v in rec.items()
+            if k in old and not _same_value(schema.column_type(list_key, k), v, old[k])}
+
+
 def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, update_existing: bool,
                 user_name: str = "", managers: dict | None = None) -> dict:
     """Lập danh sách thao tác ghi cho dữ liệu nhập.
 
-    Trả về {"ops": [...], "create": n, "update": n, "skip": n, "problems": [...]}; số dòng Excel tính từ 2.
+    Dòng trùng khóa: chỉ ghi các cột thay đổi (dòng giống hệt được bỏ qua). Ô trống không ghi đè.
+    Trả về {"ops", "create", "update", "same", "skip", "problems", "changes"}; số dòng Excel tính từ 2.
     """
     from . import thietbi
 
@@ -241,9 +261,9 @@ def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, updat
     for rec in existing.to_dict("records"):
         k = row_key(list_key, rec)
         if k:
-            index.setdefault(k, rec["id"])
-    ops, problems = [], []
-    n_create = n_update = n_skip = 0
+            index.setdefault(k, rec)
+    ops, problems, changes = [], [], []
+    n_create = n_update = n_same = n_skip = 0
     seen: dict = {}
     used_codes: dict = {}
     stt = [int(existing["STT"].max()) if "STT" in existing and not existing.empty else 0]
@@ -265,11 +285,21 @@ def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, updat
         if k:
             seen[k] = n
         if k and k in index:
-            if update_existing:
-                ops.append(("update", index[k], rec))
-                n_update += 1
-            else:
+            if not update_existing:
                 n_skip += 1
+                continue
+            old = index[k]
+            diff = changed_fields(list_key, rec, old)
+            if not diff:
+                n_same += 1
+                continue
+            ops.append(("update", old["id"], diff))
+            n_update += 1
+            key_text = " / ".join(str(rec.get(c, "")) for c in MATCH_KEYS[list_key])
+            show = lambda v: f"{v:,.0f}".replace(",", ".") if isinstance(v, (int, float)) else str(v)  # noqa: E731
+            for col, new in diff.items():
+                changes.append({"Dòng": n, "Khóa": key_text, "Cột": labels.get(col, col),
+                                "Giá trị cũ": show(old[col]), "Giá trị mới": show(new)})
             continue
         if list_key == schema.THIET_BI:
             rec = thietbi.prepare_new(rec, codes, used_codes, stt, managers or {}, user_name)
@@ -281,4 +311,5 @@ def plan_import(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, updat
             rec["STT"] = stt[0]
         ops.append(("create", rec))
         n_create += 1
-    return {"ops": ops, "create": n_create, "update": n_update, "skip": n_skip, "problems": problems}
+    return {"ops": ops, "create": n_create, "update": n_update, "same": n_same, "skip": n_skip,
+            "problems": problems, "changes": changes}

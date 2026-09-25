@@ -91,7 +91,7 @@ st.dataframe(rows.head(50).astype(object).fillna("").rename(columns=labels), hid
 
 update_existing = st.radio(
     "Dòng đã có trên SharePoint (trùng khóa)", [True, False], horizontal=True,
-    format_func=lambda v: "Cập nhật theo file" if v else "Bỏ qua, chỉ thêm dòng mới",
+    format_func=lambda v: "Ghi đè theo file (chỉ cập nhật phần thay đổi)" if v else "Giữ nguyên, chỉ thêm dòng mới",
     disabled=not keys,
 )
 plan = excel_io.plan_import(
@@ -100,14 +100,18 @@ plan = excel_io.plan_import(
 )
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Thêm mới", plan["create"], border=True)
-m2.metric("Cập nhật", plan["update"], border=True)
-m3.metric("Bỏ qua", plan["skip"], border=True)
+m2.metric("Cập nhật (có thay đổi)", plan["update"], border=True)
+m3.metric("Không đổi / bỏ qua", plan["same"] + plan["skip"], border=True,
+          help="Dòng đã có và giống hệt file (hoặc bị bỏ qua theo lựa chọn ở trên) – không ghi lại.")
 m4.metric("Lỗi", len(plan["problems"]), border=True)
+if plan["changes"]:
+    with st.expander(f"Xem {len(plan['changes'])} ô sẽ được ghi đè ({plan['update']} dòng)"):
+        st.dataframe(plan["changes"], hide_index=True, width="stretch")
 if plan["problems"]:
     with st.expander(f"{len(plan['problems'])} dòng lỗi sẽ không được nhập", expanded=True):
         for p in plan["problems"][:100]:
             st.write("•", p)
-st.caption("Ô trống trong file không ghi đè dữ liệu đang có.")
+st.caption("Chỉ những ô **khác** với dữ liệu hiện có mới được ghi đè; ô trống trong file không xóa dữ liệu đang có.")
 
 target = "dữ liệu DEMO (không lên SharePoint)" if storage.is_demo() else "SharePoint"
 if st.button(f"Nhập {len(plan['ops'])} dòng vào {target}", type="primary", icon=":material/upload:",
@@ -122,6 +126,7 @@ if st.button(f"Nhập {len(plan['ops'])} dòng vào {target}", type="primary", i
         st.session_state["xn_version"] = st.session_state.get("xn_version", 0) + 1
         after = len(storage.load_fresh(list_key))  # đọc lại trực tiếp để xác nhận
         where = "dữ liệu DEMO" if storage.is_demo() else f"SharePoint list {real_name(list_key)}"
-        ui.flash(f"Đã nhập vào {where}: {plan['create']} thêm mới, {plan['update']} cập nhật. "
+        ui.flash(f"Đã nhập vào {where}: {plan['create']} thêm mới, {plan['update']} cập nhật, "
+                 f"{plan['same']} không đổi. "
                  f"List hiện có {after} dòng (trước khi nhập: {len(data)}).")
         st.rerun()
