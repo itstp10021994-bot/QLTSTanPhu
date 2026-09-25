@@ -88,7 +88,8 @@ with tab_export:
         st.markdown("**2. Đại diện Ban bàn giao tài sản**")
         c1, c2, c3 = st.columns([1, 1, 2])
         n_ban = c1.number_input("Số thành viên", min_value=1, max_value=6, value=3, step=1, key="bg_nban")
-        ngay = c2.date_input("Ngày bàn giao", value=date.today(), format="DD/MM/YYYY", key="bg_ngay")
+        ngay = c2.date_input("Ngày bàn giao (mặc định)", value=date.today(), format="DD/MM/YYYY", key="bg_ngay",
+                             help="Áp dụng cho mọi phòng; đổi ngày riêng từng phòng ở cột Ngày bàn giao (mục 3).")
         nam_hoc = c3.text_input("Năm (in trên tiêu đề)", bangiao.school_year(ngay), key=f"bg_nam_{ngay}")
         ban = []
         for i in range(int(n_ban)):
@@ -101,17 +102,20 @@ with tab_export:
         st.info("Chọn phòng để lập biên bản.", icon=":material/touch_app:")
         st.stop()
 
-    st.markdown("**3. Đại diện đơn vị sử dụng** – mặc định là người quản lý phòng, sửa trực tiếp nếu cần")
+    st.markdown("**3. Đại diện đơn vị sử dụng & ngày bàn giao** – mặc định là người quản lý phòng và ngày ở mục 2; "
+                "sửa trực tiếp trong bảng (bấm vào ô Ngày bàn giao để chọn ngày riêng cho từng phòng)")
     rows = []
     for room in chosen:
         email = managers.get(room, "")
         name, title = thietbi.person_info(email) if email else ("", "")
-        rows.append({"Phong": room, "Ten": fmt_room(room), "Email": email, "DaiDien": name, "ChucVu": title,
-                     "SoTB": int((active["NoiSuDung"] == room).sum())})
+        rows.append({"Phong": room, "Ten": fmt_room(room), "NgayBG": ngay, "Email": email, "DaiDien": name,
+                     "ChucVu": title, "SoTB": int((active["NoiSuDung"] == room).sum())})
     receivers = st.data_editor(
-        pd.DataFrame(rows), hide_index=True, width="stretch", key=f"bg_recv_{hash(tuple(chosen))}",
+        pd.DataFrame(rows), hide_index=True, width="stretch", key=f"bg_recv_{hash(tuple(chosen))}_{ngay}",
         disabled=["Phong", "Ten", "Email", "SoTB"],
-        column_config={"Phong": None, "Ten": "Đơn vị sử dụng tài sản", "Email": "Email quản lý phòng",
+        column_config={"Phong": None, "Ten": "Đơn vị sử dụng tài sản",
+                       "NgayBG": st.column_config.DateColumn("Ngày bàn giao", format="DD/MM/YYYY", required=True),
+                       "Email": "Email quản lý phòng",
                        "DaiDien": "Đại diện đơn vị", "ChucVu": "Chức vụ", "SoTB": "Số thiết bị"},
     )
     missing = receivers[receivers["DaiDien"].fillna("").str.strip() == ""]
@@ -122,7 +126,8 @@ with tab_export:
     docs = [
         bangiao.BanGiao(
             don_vi=r.Ten, dai_dien=(r.DaiDien or "").strip(), dai_dien_cv=(r.ChucVu or "").strip(), ban=ban,
-            rows=bangiao.group_assets(active[active["NoiSuDung"] == r.Phong]), ngay=ngay,
+            rows=bangiao.group_assets(active[active["NoiSuDung"] == r.Phong]), ngay=pd.Timestamp(r.NgayBG).date()
+            if pd.notna(r.NgayBG) else ngay,
             nam_hoc=nam_hoc.strip(), sheet=r.Phong,
         )
         for r in receivers.itertuples()
@@ -143,6 +148,7 @@ with tab_export:
 
     st.markdown("##### Xem trước")
     for d in docs:
-        with st.expander(f"{d.don_vi} – {len(d.rows)} dòng, tổng số lượng {d.rows['sl'].sum():g} · "
+        with st.expander(f"{d.don_vi} – ngày {d.ngay:%d/%m/%Y} – {len(d.rows)} dòng, tổng số lượng "
+                         f"{d.rows['sl'].sum():g} · "
                          f"Đại diện: {d.dai_dien or '(chưa có)'}"):
             st.html(bangiao.to_html(d))
