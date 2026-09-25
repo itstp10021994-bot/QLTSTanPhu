@@ -457,7 +457,7 @@ class BridgeStore(SharePointStore):
         self.key = cfg["key"]
 
     # -- gọi flow --
-    def _call(self, payload: dict, timeout: int = 120):
+    def _call(self, payload: dict, timeout: int = 75):
         body = {"key": self.key, **payload}
         write = payload.get("method") in ("POST", "PATCH", "DELETE", "MERGE")
         timed_out = 0
@@ -465,8 +465,9 @@ class BridgeStore(SharePointStore):
             try:
                 resp = requests.post(self.flow_url, json=body, timeout=90 if write else timeout)
             except requests.Timeout as exc:
-                raise StorageError("flow Power Automate không phản hồi (quá thời gian chờ) – xem lịch sử chạy "
-                                   "(Run history) của flow để biết bước nào bị treo.") from exc
+                raise StorageError("flow Power Automate không phản hồi (quá thời gian chờ). Mở flow QLTB-API → "
+                                   "Run history: nếu có nhiều lần chạy đang 'Running' thì hủy (Cancel) chúng, "
+                                   "đợi 1–2 phút rồi bấm Làm mới.") from exc
             except requests.RequestException as exc:
                 raise StorageError(f"Không gọi được flow Power Automate: {exc}") from exc
             if resp.status_code in (502, 504):
@@ -833,6 +834,9 @@ def load(list_name: str) -> pd.DataFrame:
     return df.copy()
 
 
+PREFETCH_TIMEOUT = 45  # giây
+
+
 def prefetch(list_names: list[str] | None = None) -> None:
     """Tải trước nhiều list CÙNG LÚC (song song) – nhanh hơn nhiều so với tải lần lượt
     khi mỗi lần đọc phải chạy flow Power Automate. Lỗi được bỏ qua ở đây (sẽ hiện khi trang đọc list)."""
@@ -843,7 +847,7 @@ def prefetch(list_names: list[str] | None = None) -> None:
     stale = [n for n in (list_names or list(schema.LISTS)) if _cached((scope, n)) is None]
     if len(stale) < 2:
         return
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, wait
 
     store = get_store()
     if hasattr(store, "resolve_all"):
@@ -851,11 +855,17 @@ def prefetch(list_names: list[str] | None = None) -> None:
             store.resolve_all()  # tìm ID các list bằng MỘT lần gọi trước khi chạy song song
         except StorageError:
             return
-    with st.spinner("Đang tải dữ liệu..."), ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {name: pool.submit(store.list_items, name) for name in stale}
-        for name, fut in futures.items():
-            if fut.exception() is None:
-                _put((scope, name), _to_frame(name, fut.result()))
+    pool = ThreadPoolExecutor(max_workers=6)
+    try:
+        with st.spinner("Đang tải dữ liệu..."):
+            futures = {pool.submit(store.list_items, name): name for name in stale}
+            # Không chờ mãi khi flow chậm/treo: list nào chưa xong thì trang sẽ tự đọc lại (và báo lỗi rõ ràng)
+            done, _ = wait(futures, timeout=PREFETCH_TIMEOUT)
+            for fut in done:
+                if fut.exception() is None:
+                    _put((scope, futures[fut]), _to_frame(futures[fut], fut.result()))
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def load_fresh(list_name: str) -> pd.DataFrame:
