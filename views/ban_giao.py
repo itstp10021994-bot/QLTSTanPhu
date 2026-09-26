@@ -69,7 +69,7 @@ with tab_view:
     table = view_frame(g)
     st.dataframe(table, hide_index=True, width="stretch", height=560,
                  column_config={"Số lượng": st.column_config.NumberColumn(format="localized")})
-    st.download_button("Tải bảng này (Excel)", ui.to_excel({"TaiSanHienCo": table}),
+    st.download_button("Tải bảng này (Excel)", lambda: ui.to_excel({"TaiSanHienCo": table}), on_click="ignore",
                        file_name=f"tai_san_hien_co_{date.today():%Y%m%d}.xlsx", icon=":material/download:")
 
 # ---------------------------------------------------------------------------

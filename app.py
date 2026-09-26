@@ -14,6 +14,7 @@ logo = ui.logo_path()
 if logo:
     st.logo(logo, size="large")
 
+top = st.container()  # băng tiêu đề (vẽ sau khi biết người dùng)
 try:
     user = auth.current_user()
 except storage.TokenExpired:
@@ -24,6 +25,8 @@ except storage.StorageError as exc:
     st.stop()
 
 if user is None:
+    with top:
+        ui.header(None)
     ui.footer()
     st.stop()
 
@@ -62,20 +65,10 @@ if user.is_admin:
         page("khoi_tao_sharepoint.py", "Kết nối SharePoint", ":material/lan:"),
     ]
 
-nav = st.navigation(sections, expanded=True)  # luôn hiện đủ menu (mặc định chỉ hiện 10 mục)
+nav = st.navigation(sections, position="top")  # thanh menu ngang phía trên
 
-with st.sidebar:
-    st.divider()
-    st.caption(f"Đăng nhập: **{user.email}**")
-    c1, c2 = st.columns(2)
-    if c1.button("Làm mới", icon=":material/refresh:", width="stretch",
-                 help="Tải lại dữ liệu và dò lại cột SharePoint (sau khi sửa list trên SharePoint)."):
-        storage.refresh(schema_too=True)
-        st.rerun()
-    if c2.button("Đăng xuất", icon=":material/logout:", width="stretch"):
-        auth.logout()
-
-ui.header(user.name)
+with top:
+    ui.header(user)
 if st.session_state.get("startup_error"):
     st.warning(
         "Chưa đọc được dữ liệu phân quyền từ SharePoint. Nếu đây là lần đầu, quản trị viên hãy vào "

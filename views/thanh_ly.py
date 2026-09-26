@@ -121,8 +121,8 @@ with tab_rounds:
         with st.container(border=True):
             st.markdown(f"**In lại biểu mẫu – {dot}** (nội dung tờ trình dùng mẫu mặc định; muốn sửa, mở bản Word)")
             downloads(tl_r, f"{dot}".replace(" ", "_").replace("–", "-"), key="tlr")
-        st.download_button("Tải danh sách đợt này (Excel)",
-                           ui.to_excel({"ThanhLy": rows.drop(columns="id").rename(
+        st.download_button("Tải danh sách đợt này (Excel)", on_click="ignore",
+                           data=lambda: ui.to_excel({"ThanhLy": rows.drop(columns="id").rename(
                                columns=schema.labels_of(schema.THANH_LY))}),
                            file_name=f"thanh_ly_{dot}.xlsx", icon=":material/download:")
 

@@ -204,7 +204,11 @@ def header(col: str) -> str:
     return spec if isinstance(spec, str) else spec["label"]
 
 
-sheets = {name: df.rename(columns=header) for name, df in SHEETS.items()}
-sheets["CanXuLy"] = bad.drop(columns="id").rename(columns=schema.labels_of(schema.THIET_BI))
-st.download_button("Xuất toàn bộ báo cáo (Excel, mỗi bảng 1 sheet)", ui.to_excel(sheets),
+def report_xlsx() -> bytes:
+    sheets = {name: df.rename(columns=header) for name, df in SHEETS.items()}
+    sheets["CanXuLy"] = bad.drop(columns="id").rename(columns=schema.labels_of(schema.THIET_BI))
+    return ui.to_excel(sheets)
+
+
+st.download_button("Xuất toàn bộ báo cáo (Excel, mỗi bảng 1 sheet)", report_xlsx, on_click="ignore",
                    file_name=f"bao_cao_{date.today():%Y%m%d}.xlsx", type="primary", icon=":material/download:")

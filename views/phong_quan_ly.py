@@ -33,6 +33,7 @@ for room in rooms:
         else:
             ui.show_table(items, schema.THIET_BI, cols)
 
-st.download_button("Tải danh sách thiết bị (Excel)",
-                   ui.to_excel({"ThietBi": mine.drop(columns="id").rename(columns=schema.labels_of(schema.THIET_BI))}),
+st.download_button("Tải danh sách thiết bị (Excel)", on_click="ignore",
+                   data=lambda: ui.to_excel({"ThietBi": mine.drop(columns="id").rename(
+                       columns=schema.labels_of(schema.THIET_BI))}),
                    file_name="thiet_bi_phong_quan_ly.xlsx", icon=":material/download:")

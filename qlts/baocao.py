@@ -68,17 +68,17 @@ def group_by_status(act: pd.DataFrame) -> pd.DataFrame:
 
 def by_room(act: pd.DataFrame, labels: dict, managers: dict, rooms: list[str]) -> pd.DataFrame:
     """Bảng 3 – Theo nơi sử dụng."""
-    rows = []
-    for room in rooms:
-        items = act[act["NoiSuDung"] == room]
-        rows.append({
-            "Phong": labels.get(room, room), "QuanLy": managers.get(room, ""), "SoTB": len(items),
-            "SoLoai": items["MaTaiSan"].nunique(), "CanXuLy": int(thietbi.needs_attention(items).sum()),
-            "GiaTri": items["GiaTri"].sum(),
-        })
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
+    if not rooms:
+        return pd.DataFrame()
+    need = thietbi.needs_attention(act)
+    g = act.assign(_need=need).groupby("NoiSuDung").agg(
+        SoTB=("id", "size"), SoLoai=("MaTaiSan", "nunique"), CanXuLy=("_need", "sum"), GiaTri=("GiaTri", "sum"))
+    g = g.reindex(rooms).fillna(0)
+    df = pd.DataFrame({
+        "Phong": [labels.get(r, r) for r in g.index], "QuanLy": [managers.get(r, "") for r in g.index],
+        "SoTB": g["SoTB"].astype(int).values, "SoLoai": g["SoLoai"].astype(int).values,
+        "CanXuLy": g["CanXuLy"].astype(int).values, "GiaTri": g["GiaTri"].values,
+    })
     df = df.sort_values("GiaTri", ascending=False)
     df["TyLeGT"] = _pct(df["GiaTri"], df["GiaTri"].sum())
     return add_total(df, "Phong", ["SoTB", "CanXuLy", "GiaTri"], {"TyLeGT": ""},
@@ -162,20 +162,17 @@ def by_value_band(act: pd.DataFrame) -> pd.DataFrame:
 
 def by_manager(act: pd.DataFrame, managers: dict, people: dict) -> pd.DataFrame:
     """Bảng 8 – Theo người quản lý phòng."""
-    rows = {}
-    for room, email in managers.items():
-        if not email:
-            continue
-        items = act[act["NoiSuDung"] == room]
-        r = rows.setdefault(email, {"Email": email, "HoTen": people.get(email, ""), "SoPhong": 0, "SoTB": 0,
-                                    "CanXuLy": 0, "GiaTri": 0.0})
-        r["SoPhong"] += 1
-        r["SoTB"] += len(items)
-        r["CanXuLy"] += int(thietbi.needs_attention(items).sum())
-        r["GiaTri"] += float(items["GiaTri"].sum())
-    df = pd.DataFrame(list(rows.values()))
-    if df.empty:
-        return df
+    mgr = {room: email for room, email in managers.items() if email}
+    if not mgr:
+        return pd.DataFrame()
+    per_room = act.assign(_need=thietbi.needs_attention(act)).groupby("NoiSuDung").agg(
+        SoTB=("id", "size"), CanXuLy=("_need", "sum"), GiaTri=("GiaTri", "sum"))
+    rooms = pd.DataFrame({"Email": list(mgr.values())}, index=list(mgr.keys()))
+    rooms = rooms.join(per_room).fillna(0)
+    df = rooms.groupby("Email").agg(SoPhong=("Email", "size"), SoTB=("SoTB", "sum"), CanXuLy=("CanXuLy", "sum"),
+                                    GiaTri=("GiaTri", "sum")).reset_index()
+    df.insert(1, "HoTen", df["Email"].map(lambda e: people.get(e, "")))
+    df[["SoTB", "CanXuLy"]] = df[["SoTB", "CanXuLy"]].astype(int)
     df = df.sort_values("SoTB", ascending=False)
     return add_total(df, "Email", ["SoPhong", "SoTB", "CanXuLy", "GiaTri"])
 

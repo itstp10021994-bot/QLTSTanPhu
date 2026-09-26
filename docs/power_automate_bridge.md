@@ -144,7 +144,7 @@ key = "<mã bí mật ở bước 1>"
   như *Người thực hiện*, *Người kiểm kê*, *Người xác nhận*.
 - Người dùng **không cần** quyền trên site SharePoint – chỉ chủ flow cần.
 - Mỗi lần app đọc/ghi = 1 lần chạy flow (khoảng 1–2 giây). App tải các list **song song**, giữ dữ liệu
-  10 phút (`[app] cache_minutes`), sau khi ghi chỉ tải lại đúng list vừa ghi, và ghi hàng loạt 6 yêu cầu song song.
+  10 phút (`[app] cache_minutes`); hết hạn thì vẫn hiện ngay dữ liệu đang có và tự tải bản mới ở chế độ nền, sau khi ghi chỉ tải lại đúng list vừa ghi, và ghi hàng loạt 6 yêu cầu song song.
   Nếu sửa dữ liệu trực tiếp trên SharePoint, bấm **Làm mới** ở thanh bên để app thấy ngay. Gói Premium cho phép hàng chục nghìn lần chạy mỗi ngày – đủ dùng.
 - Nếu flow bị tắt, hết hạn Premium, hoặc bạn đổi mật khẩu làm hỏng kết nối SharePoint/Outlook trong flow, app sẽ
   báo lỗi kết nối – vào flow sửa kết nối (Connections) là chạy lại.

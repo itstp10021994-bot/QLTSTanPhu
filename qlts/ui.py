@@ -16,35 +16,89 @@ ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
 CSS = """
 <style>
-[data-testid="stMainBlockContainer"], .block-container {padding-top: 3.5rem !important;}
-.qlts-header {display:flex; align-items:center; justify-content:space-between;
-  border-bottom:1px solid rgba(128,128,128,.25); padding:.4rem 0 .8rem; margin-bottom:1rem; gap:1rem; flex-wrap:wrap}
-.qlts-school {font-size:.8rem; line-height:1.2; color:#1f3a93; font-weight:600}
-.qlts-title {color:#e00000; font-weight:700; font-size:1.35rem; text-align:center; flex:1}
-.qlts-user {color:#1f4e8c; font-weight:600; font-size:.95rem}
-.st-key-dlg_confirm button, [class*="st-key-act_del"] button {background:#d32f2f !important;
-  border-color:#d32f2f !important; color:#fff !important}
-.st-key-dlg_confirm button:hover, [class*="st-key-act_del"] button:hover {background:#b71c1c !important}
-[class*="st-key-act_del"] button:disabled {background:transparent !important; color:rgba(128,128,128,.6) !important;
-  border-color:rgba(128,128,128,.3) !important}
-.qlts-footer {text-align:center; font-style:italic; color:#1f4e8c; margin-top:2.5rem;
-  border-top:1px solid rgba(128,128,128,.25); padding-top:.6rem; font-size:.9rem}
+/* ---- Khung trang ---- */
+[data-testid="stMainBlockContainer"], .block-container {padding-top: 4.2rem !important; max-width: 1400px;}
+h3 {font-weight: 700 !important; letter-spacing: -.01em; color: #0f172a;}
+h5 {font-weight: 650 !important; color: #0f172a;}
+
+/* ---- Băng tiêu đề ---- */
+.qlts-hero {display:flex; align-items:center; gap:1rem; padding:.9rem 1.2rem; border-radius:16px;
+  background: linear-gradient(120deg, #0b3a8c 0%, #1d4ed8 55%, #3b82f6 100%); color:#fff;
+  box-shadow: 0 6px 20px rgba(29,78,216,.18);}
+.qlts-hero img {height:46px; background:#fff; border-radius:10px; padding:4px 6px;}
+.qlts-hero .school {font-size:.78rem; font-weight:600; opacity:.9; letter-spacing:.03em; text-transform:uppercase}
+.qlts-hero .title {font-size:1.35rem; font-weight:700; line-height:1.25}
+.qlts-hero .user {margin-left:auto; text-align:right; font-size:.85rem; line-height:1.3}
+.qlts-hero .user b {font-size:.95rem}
+@media (max-width: 640px) {.qlts-hero .user {display:none} .qlts-hero .title {font-size:1.1rem}}
+
+/* ---- Thẻ số liệu, khung viền ---- */
+[data-testid="stMetric"] {background:#fff; border:1px solid #e5eaf2; border-radius:14px; padding:.8rem 1rem;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05);}
+[data-testid="stMetricValue"] {color:#0f172a}
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {background:#fff;}
+[data-testid="stExpander"] details {background:#fff; border-radius:12px;}
+[data-testid="stDataFrame"] {border-radius:12px; overflow:hidden;}
+[data-testid="stForm"] {background:#fff; box-shadow: 0 1px 3px rgba(15,23,42,.05);}
+[data-testid="stPageLink"] a {background:#fff; border:1px solid #e5eaf2; border-radius:12px; padding:.55rem .8rem;}
+[data-testid="stPageLink"] a:hover {border-color:#1d4ed8; background:#f5f8ff;}
+
+/* ---- Nút xóa màu đỏ ---- */
+.st-key-dlg_confirm button, [class*="st-key-act_del"] button {background:#dc2626 !important;
+  border-color:#dc2626 !important; color:#fff !important}
+.st-key-dlg_confirm button:hover, [class*="st-key-act_del"] button:hover {background:#b91c1c !important}
+[class*="st-key-act_del"] button:disabled {background:transparent !important; color:rgba(100,116,139,.6) !important;
+  border-color:rgba(100,116,139,.3) !important}
+
+.qlts-footer {text-align:center; color:#64748b; margin-top:2.5rem; border-top:1px solid #e2e8f0;
+  padding-top:.8rem; font-size:.85rem}
 </style>
 """
 
 
-def header(user_name: str) -> None:
+def _logo_b64() -> str:
+    import base64
+
+    path = logo_path()
+    if not path:
+        return ""
+    mime = "image/png" if path.endswith(".png") else "image/svg+xml" if path.endswith(".svg") else "image/jpeg"
+    return f"data:{mime};base64," + base64.b64encode(Path(path).read_bytes()).decode()
+
+
+def header(user) -> None:
+    """Băng tiêu đề (logo, tên trường, tên ứng dụng) + nút tài khoản (làm mới / đăng xuất)."""
+    from . import auth
+
     school = app_setting("school_name", "TRƯỜNG TH-THCS-THPT TÂN PHÚ")
     title = app_setting("app_title", "ỨNG DỤNG QUẢN LÝ THIẾT BỊ")
     st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown(
-        f"""<div class="qlts-header">
-              <div class="qlts-school">{html.escape(str(school))}</div>
-              <div class="qlts-title">{html.escape(str(title))}</div>
-              <div class="qlts-user">{html.escape(user_name)}</div>
-            </div>""",
+    logo = _logo_b64()
+    if user is None:  # màn hình đăng nhập
+        c1, c2 = st.container(), None
+    else:
+        c1, c2 = st.columns([10, 2], vertical_alignment="center")
+    user_box = (f'<div class="user"><b>{html.escape(user.name)}</b><br>{html.escape(user.chuc_danh)}</div>'
+                if user is not None else "")
+    img = f'<img src="{logo}" alt="logo">' if logo else ""
+    # HTML một dòng (Markdown coi dòng thụt đầu là khối code)
+    c1.markdown(
+        f'<div class="qlts-hero">{img}<div><div class="school">{html.escape(str(school))}</div>'
+        f'<div class="title">{html.escape(str(title))}</div></div>{user_box}</div>',
         unsafe_allow_html=True,
     )
+    if c2 is None:
+        return
+    with c2.popover("Tài khoản", icon=":material/account_circle:", width="stretch"):
+        st.markdown(f"**{user.name}**  \n{user.email}")
+        if user.roles:
+            st.caption("Vai trò: " + ", ".join(sorted(user.roles)))
+        if st.button("Làm mới dữ liệu", icon=":material/refresh:", width="stretch",
+                     help="Tải lại dữ liệu và dò lại cột SharePoint (sau khi sửa list trực tiếp trên SharePoint)."):
+            storage.refresh(schema_too=True)
+            st.rerun()
+        if st.button("Đăng xuất", icon=":material/logout:", width="stretch"):
+            auth.logout()
     if storage.is_demo():
         problem = sharepoint_config_problem() or "Chưa cấu hình kết nối SharePoint trong Secrets."
         st.warning(
@@ -60,7 +114,7 @@ def footer() -> None:
 
 
 def logo_path() -> str | None:
-    for name in ("logo.png", "logo.jpg", "logo.svg"):
+    for name in ("logo.png", "logo.jpg", "logo.svg", "bienban_logo.jpeg"):
         if (ASSETS / name).exists():
             return str(ASSETS / name)
     return None

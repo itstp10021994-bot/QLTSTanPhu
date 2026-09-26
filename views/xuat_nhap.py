@@ -46,21 +46,29 @@ st.markdown("##### Xuất")
 data = storage.load(list_key)
 c1, c2, c3 = st.columns(3)
 c1.download_button(
-    "Biểu mẫu trống", excel_io.template_workbook(list_key, real_name(list_key)),
+    "Biểu mẫu trống", lambda: excel_io.template_workbook(list_key, real_name(list_key)), on_click="ignore",
     file_name=f"bieu_mau_{real_name(list_key)}.xlsx", icon=":material/description:", width="stretch",
     help="Có 1 dòng mẫu và sheet hướng dẫn kiểu cột. Dùng để nhập dữ liệu hoặc tạo list mới trên SharePoint.",
 )
 c2.download_button(
     f"Dữ liệu hiện có ({len(data)} dòng)",
-    excel_io.template_workbook(list_key, real_name(list_key), rows=data.drop(columns="id")),
+    lambda: excel_io.template_workbook(list_key, real_name(list_key), rows=data.drop(columns="id")),
+    on_click="ignore",
     file_name=f"{real_name(list_key)}_{today}.xlsx", icon=":material/download:", width="stretch",
     help="Sửa file này rồi nhập lại: các dòng trùng khóa sẽ được cập nhật.",
 )
-buf = io.BytesIO()
-with zipfile.ZipFile(buf, "w") as zf:
-    for key, (filename, name) in excel_io.FILES.items():
-        zf.writestr(filename, excel_io.template_workbook(key, real_name(key)))
-c3.download_button("Tất cả biểu mẫu (.zip)", buf.getvalue(), file_name="bieu_mau_qltb.zip",
+names = {key: real_name(key) for key in excel_io.FILES}
+
+
+def all_templates() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for key, (filename, _name) in excel_io.FILES.items():
+            zf.writestr(filename, excel_io.template_workbook(key, names[key]))
+    return buf.getvalue()
+
+
+c3.download_button("Tất cả biểu mẫu (.zip)", all_templates, file_name="bieu_mau_qltb.zip", on_click="ignore",
                    icon=":material/folder_zip:", width="stretch")
 
 keys = excel_io.MATCH_KEYS[list_key]

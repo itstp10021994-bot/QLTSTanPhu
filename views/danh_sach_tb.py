@@ -80,13 +80,24 @@ with tab_edit:
     updates, creates, problems = [], [], []
     used_codes: dict = {}
     stt = [int(tb["STT"].max()) if not tb.empty else 0]
+    # Lọc nhanh (vectơ hóa) các dòng có thể đã sửa, rồi mới so sánh chi tiết từng ô -> nhanh với hàng nghìn dòng
+    existing = edited[edited["id"].isin(before.index)]
+    if not existing.empty:
+        a = existing.set_index("id")[shown].astype(object)
+        b = before.loc[a.index, shown].astype(object)
+
+        def blank(df: pd.DataFrame) -> pd.DataFrame:
+            return df.isna() | df.isin(["", 0])
+
+        maybe = ((a != b) & ~(blank(a) & blank(b))).any(axis=1)
+        for item_id in maybe[maybe].index:
+            changed = {c: a.at[item_id, c] for c in shown if not same(a.at[item_id, c], b.at[item_id, c])}
+            if changed:
+                updates.append(("update", item_id, changed))
     for n, row in enumerate(edited.to_dict("records"), start=1):
         if row.get("id") in before.index:
-            old = before.loc[row["id"]]
-            changed = {c: row[c] for c in shown if not same(row[c], old[c])}
-            if changed:
-                updates.append(("update", row["id"], changed))
-        elif any(not same(v, None) for k, v in row.items() if k != "id"):
+            continue
+        if any(not same(v, None) for k, v in row.items() if k != "id"):
             fields = new_row_fields(row, used_codes, stt)
             if isinstance(fields, str):
                 problems.append(f"Dòng mới {n}: {fields}")
@@ -136,10 +147,10 @@ with tab_edit:
 # ---------------------------------------------------------------------------
 with tab_import:
     st.markdown("##### Xuất Excel")
-    export = tb.drop(columns="id").rename(columns=labels)
-    st.download_button("Tải toàn bộ danh sách (Excel)", ui.to_excel({"ThietBi": export}),
+    st.download_button("Tải toàn bộ danh sách (Excel)", on_click="ignore",
+                       data=lambda: ui.to_excel({"ThietBi": tb.drop(columns="id").rename(columns=labels)}),
                        file_name="danh_sach_thiet_bi.xlsx", icon=":material/download:")
-    st.download_button("Tải file mẫu để nhập", excel_io.template_workbook(TB, "Thiết bị"),
+    st.download_button("Tải file mẫu để nhập", lambda: excel_io.template_workbook(TB, "Thiết bị"), on_click="ignore",
                        file_name="mau_nhap_thiet_bi.xlsx", icon=":material/description:")
 
     st.markdown("##### Nhập từ Excel")

@@ -835,7 +835,10 @@ def _to_frame(list_name: str, rows: list[dict]) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 @st.cache_resource
 def _data_cache() -> dict:
-    return {"lock": threading.Lock(), "data": {}}
+    return {"lock": threading.Lock(), "data": {}, "refreshing": set(), "gen": {}}
+
+
+STALE_MAX = 12 * 3600  # dữ liệu cũ hơn mức này thì phải chờ tải lại (không dùng tạm)
 
 
 def _cache_ttl() -> float:
@@ -854,6 +857,44 @@ def _cached(key) -> pd.DataFrame | None:
     return None
 
 
+def _stale(key) -> pd.DataFrame | None:
+    """Bản đã hết hạn nhưng còn dùng tạm được (và kích hoạt tải lại ngầm)."""
+    hit = _data_cache()["data"].get(key)
+    if hit and time.time() - hit[0] < STALE_MAX:
+        _refresh_in_background(key)
+        return hit[1]
+    return None
+
+
+def _refresh_in_background(key) -> None:
+    """Tải lại một list trong luồng nền; người dùng vẫn thấy dữ liệu cũ ngay (không phải chờ flow)."""
+    cfg = sharepoint_config()
+    if cfg and cfg["mode"] == "delegated":  # cần token của người đăng nhập -> không chạy nền
+        return
+    cache = _data_cache()
+    with cache["lock"]:
+        if key in cache["refreshing"]:
+            return
+        cache["refreshing"].add(key)
+    store, list_name = get_store(), key[1]
+    gen = cache["gen"].get(list_name, 0)
+
+    def work():
+        try:
+            df = _to_frame(list_name, store.list_items(list_name))
+            with cache["lock"]:
+                # Bỏ kết quả nếu trong lúc tải app vừa ghi vào list (dữ liệu đọc được có thể đã cũ)
+                if cache["gen"].get(list_name, 0) == gen:
+                    cache["data"][key] = (time.time(), df)
+        except Exception:  # noqa: BLE001 - lần sau sẽ thử lại; dữ liệu cũ vẫn dùng được
+            pass
+        finally:
+            with cache["lock"]:
+                cache["refreshing"].discard(key)
+
+    threading.Thread(target=work, daemon=True).start()
+
+
 def _put(key, df: pd.DataFrame) -> None:
     with _data_cache()["lock"]:
         _data_cache()["data"][key] = (time.time(), df)
@@ -863,6 +904,8 @@ def load(list_name: str) -> pd.DataFrame:
     """DataFrame các mục của list (cột ``id`` là ID item SharePoint)."""
     key = (_cache_scope(), list_name)
     df = _cached(key)
+    if df is None:
+        df = _stale(key)
     if df is None:
         with st.spinner("Đang tải dữ liệu..."):
             df = _to_frame(list_name, get_store().list_items(list_name))
@@ -880,7 +923,8 @@ def prefetch(list_names: list[str] | None = None) -> None:
     if not cfg or cfg["mode"] == "delegated":  # delegated cần ngữ cảnh người dùng -> không chạy song song
         return
     scope = _cache_scope()
-    stale = [n for n in (list_names or list(schema.LISTS)) if _cached((scope, n)) is None]
+    stale = [n for n in (list_names or list(schema.LISTS))
+             if _cached((scope, n)) is None and _stale((scope, n)) is None]
     if len(stale) < 2:
         return
     from concurrent.futures import ThreadPoolExecutor, wait
@@ -917,9 +961,12 @@ def refresh(list_name: str | None = None, schema_too: bool = False) -> None:
     with cache["lock"]:
         if list_name is None:
             cache["data"].clear()
+            for name in schema.LISTS:
+                cache["gen"][name] = cache["gen"].get(name, 0) + 1
         else:
             for key in [k for k in cache["data"] if k[1] == list_name]:
                 cache["data"].pop(key, None)
+            cache["gen"][list_name] = cache["gen"].get(list_name, 0) + 1
     if schema_too:
         store = get_store()
         if hasattr(store, "forget_schema"):

@@ -29,5 +29,5 @@ with tab_result:
                 "TrangThai", "GhiChu", "NgayKiemKe", "TrangThaiKiemKe", "NgayXacNhan", "TrangThaiXacNhan"]
         view = data[cols].rename(columns={**schema.labels_of(schema.KIEM_KE), "ChenhLech": "Chênh lệch"})
         st.dataframe(view, hide_index=True, width="stretch")
-        st.download_button("Tải Excel", ui.to_excel({"KiemKe": view}), file_name=f"kiem_ke_{dot}.xlsx",
+        st.download_button("Tải Excel", lambda: ui.to_excel({"KiemKe": view}), on_click="ignore", file_name=f"kiem_ke_{dot}.xlsx",
                            icon=":material/download:")
