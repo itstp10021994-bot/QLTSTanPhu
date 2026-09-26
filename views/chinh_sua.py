@@ -14,14 +14,18 @@ show_all = st.toggle("Hiện cả tài sản đã thanh lý", key="cs_all")
 filtered = ui.equipment_filters(tb if show_all else thietbi.active(tb), "cs").reset_index(drop=True)
 ver = st.session_state.setdefault("cs_ver", 0)
 
-st.caption(f"{len(filtered)} thiết bị – tick ô đầu dòng rồi bấm **Sửa** hoặc **Xóa**.")
-actions = st.container()  # nút Sửa / Xóa nằm trên bảng
+st.caption(f"{len(filtered)} thiết bị – **bấm vào một dòng** để mở cửa sổ chỉnh sửa (có nút xóa trong đó).")
 event = st.dataframe(
     filtered[ui.TB_VIEW].rename(columns=schema.labels_of(schema.THIET_BI)),
-    hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"cs_table_{ver}",
+    hide_index=True, width="stretch", on_select="rerun", selection_mode=["single-row", "single-cell"],
+    key=f"cs_table_{ver}_{hash(tuple(filtered['id']))}",
     column_config={"Giá trị": st.column_config.NumberColumn(format="localized")},
 )
-chosen = filtered.iloc[event.selection.rows]
+# Bấm vào ô bất kỳ (hoặc ô chọn đầu dòng) đều tính là chọn dòng đó
+cells = list(getattr(event.selection, "cells", []) or [])
+sel_rows = list(event.selection.rows) or [c[0] if isinstance(c, (list, tuple)) else c["row"] for c in cells[:1]]
+chosen = filtered.iloc[sel_rows[:1]]
+sel_sig = (tuple(event.selection.rows), tuple(tuple(c) if isinstance(c, (list, tuple)) else str(c) for c in cells))
 
 
 def idx(options: list, value, default=0):
@@ -108,27 +112,39 @@ def edit_dialog(item) -> None:
             ui.flash(f"Đã cập nhật {item.MaChiTiet} ({len(changed)} thông tin).")
         else:
             ui.flash("Không có thay đổi nào.")
-        st.rerun()
+        close_and_rerun()
+
+    # ---- Xóa (hai bước ngay trong cửa sổ) ----
+    st.divider()
+    dkey = f"cs_confirm_del_{item.id}"
+    if not st.session_state.get(dkey):
+        if st.button("Xóa thiết bị này", icon=":material/delete:", key=f"act_del_cs_{item.id}"):
+            st.session_state[dkey] = True
+            st.rerun(scope="fragment")
+    else:
+        st.warning(f"Xóa **{item.MaChiTiet} – {item.TenThietBi}** khỏi SharePoint? Thao tác không thể hoàn tác. "
+                   f"Thiết bị hỏng/thanh lý nên dùng chức năng **Thanh lý** thay vì xóa.")
+        c1, c2 = st.columns(2)
+        if c1.button("Đồng ý xóa", key="dlg_confirm", icon=":material/delete_forever:", width="stretch"):
+            storage.delete(schema.THIET_BI, item.id)
+            st.session_state.pop(dkey, None)
+            ui.flash(f"Đã xóa thiết bị {item.MaChiTiet}.")
+            close_and_rerun()
+        if c2.button("Hủy", key=f"cs_del_cancel_{item.id}", width="stretch"):
+            st.session_state.pop(dkey, None)
+            st.rerun(scope="fragment")
 
 
-def delete_selected() -> str | None:
-    errors = storage.batch(schema.THIET_BI, [("delete", i) for i in chosen["id"]])
-    if errors:
-        return "Có lỗi khi xóa:\n\n" + "\n\n".join(errors[:10])
-    st.session_state["cs_ver"] = ver + 1  # bỏ chọn các dòng đã xóa
-    ui.flash(f"Đã xóa {len(chosen)} thiết bị.")
+def close_and_rerun() -> None:
+    """Đóng cửa sổ và bỏ chọn dòng (bảng mới) để lần bấm sau mở lại được."""
+    st.session_state["cs_ver"] = ver + 1
+    st.session_state.pop("cs_open", None)
+    st.rerun()
 
 
-with actions:
-    edit_clicked, del_clicked = ui.selection_actions("cs", len(chosen))
-if edit_clicked:
+# Bấm vào một dòng -> mở cửa sổ chỉnh sửa (chỉ mở khi vừa chọn dòng mới, không mở lại ở mỗi lần chạy lại trang)
+if chosen.empty:
+    st.session_state.pop("cs_open", None)
+elif st.session_state.get("cs_open") != sel_sig:
+    st.session_state["cs_open"] = sel_sig
     edit_dialog(chosen.iloc[0])
-if del_clicked:
-    ui.confirm_dialog(
-        "Xóa thiết bị",
-        f"Bạn có chắc muốn **xóa {len(chosen)} thiết bị** khỏi SharePoint?\n\n"
-        f"Thiết bị hỏng/thanh lý nên đổi *Tình trạng* hoặc *Nơi sử dụng* = “{schema.NOI_THANH_LY}” thay vì xóa.",
-        delete_selected,
-        details=[f"{r.MaChiTiet} – {r.TenThietBi} ({labels.get(r.NoiSuDung, r.NoiSuDung)})"
-                 for r in chosen.itertuples()],
-    )
