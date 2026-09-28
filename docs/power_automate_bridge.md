@@ -46,17 +46,26 @@ Mã này dùng ở **bước 3** (trong flow) và **bước 7** (trong Secrets).
 ## Bước 3 – Kiểm tra mã bí mật (Condition)
 
 Thêm bước **Condition** (Điều kiện), đặt tên `Kiem tra`. Ở ô bên trái chọn **Expression (fx)** và dán
-(thay `MA-BI-MAT` bằng key ở bước 1, thay `@igcschool.edu.vn` nếu trường dùng tên miền khác):
+(thay `MA-BI-MAT` bằng key ở bước 1; mỗi tên miền email được nhận mã đăng nhập là một dòng `endsWith(...)`):
 
 ```
 and(
   equals(triggerBody()?['key'], 'MA-BI-MAT'),
   or(
-    and(equals(triggerBody()?['action'], 'mail'), endsWith(toLower(triggerBody()?['to']), '@igcschool.edu.vn')),
+    and(
+      equals(triggerBody()?['action'], 'mail'),
+      or(
+        endsWith(toLower(triggerBody()?['to']), '@igcschool.edu.vn'),
+        endsWith(toLower(triggerBody()?['to']), '@igc.edu.vn')
+      )
+    ),
     and(equals(triggerBody()?['action'], 'sp'), startsWith(triggerBody()?['uri'], '_api/web'))
   )
 )
 ```
+
+Trong Secrets có thể khai báo cùng danh sách để app báo lỗi rõ ràng trước khi gọi flow:
+`mail_domains = ["igcschool.edu.vn", "igc.edu.vn"]` (mục `[app]`).
 
 Toán tử: **is equal to**, ô bên phải: `true`.
 

@@ -183,6 +183,13 @@ def _deny_revoked() -> None:
              "Liên hệ quản trị viên nếu cần.")
 
 
+def _domains() -> list[str]:
+    """Tên miền email được nhận mã đăng nhập ([app] mail_domains); rỗng = không giới hạn (flow tự kiểm tra)."""
+    value = app_setting("mail_domains", [])
+    items = value if isinstance(value, (list, tuple)) else str(value).split(",")
+    return [str(d).strip().lower().lstrip("@") for d in items if str(d).strip()]
+
+
 def _hash_code(email: str, code: str) -> str:
     return hmac.new(_session_secret(), f"{email}|{code}".encode(), hashlib.sha256).hexdigest()
 
@@ -194,13 +201,15 @@ def _login_screen_otp() -> None:
 
     with st.form("otp_email"):
         email = st.text_input("Email", value=pending["email"] if pending else "",
-                              placeholder="ten@igcschool.edu.vn").strip().lower()
+                              placeholder="ten@igcschool.edu.vn hoặc ten@igc.edu.vn").strip().lower()
         send = st.form_submit_button("Gửi mã", icon=":material/mail:")
     if send:
         if "@" not in email:
             st.error("Email không hợp lệ.")
         elif pending and pending["email"] == email and time.time() - pending["sent_at"] < OTP_COOLDOWN:
             st.warning(f"Vui lòng chờ {OTP_COOLDOWN - int(time.time() - pending['sent_at'])} giây rồi gửi lại.")
+        elif _domains() and not any(email.endswith("@" + d) for d in _domains()):
+            st.error("Chỉ nhận email có đuôi: " + ", ".join("@" + d for d in _domains()) + ".")
         elif email not in known_emails():
             st.error("Email này chưa được cấp quyền sử dụng ứng dụng. Liên hệ quản trị viên.")
         else:
