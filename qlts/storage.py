@@ -511,7 +511,17 @@ class BridgeStore(SharePointStore):
         return [{"email": u.get("Email", ""), "name": u.get("Title", "")} for u in data.get("value", [])]
 
     def send_mail(self, to: str, subject: str, html: str) -> None:
-        self._call({"action": "mail", "to": to, "subject": subject, "html": html})
+        try:
+            self._call({"action": "mail", "to": to, "subject": subject, "html": html})
+        except StorageError as exc:
+            if " 403" not in str(exc):
+                raise
+            domain = to.split("@")[-1]
+            raise StorageError(
+                f"flow từ chối gửi mail tới @{domain}. Nếu app vẫn đọc được dữ liệu SharePoint thì key đúng – "
+                f"lỗi nằm ở điều kiện tên miền trong bước Condition của flow (thiếu dòng "
+                f"endsWith(toLower(triggerBody()?['to']), '@{domain}') hoặc chưa Save). "
+                "Nếu app cũng không đọc được dữ liệu thì key trong biểu thức Condition gõ sai.") from exc
 
     # -- site / list --
     @property
