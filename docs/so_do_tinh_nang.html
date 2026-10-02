@@ -5,565 +5,277 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sơ đồ tính năng QLTS Tân Phú</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
 <style>
-/* Layout: sơ đồ xương cá – nút trung tâm ở giữa, 8 nhánh menu hai bên; bên dưới là hướng dẫn thao tác theo từng nhánh */
+/* Layout: sơ đồ tư duy cổ điển – nút trung tâm, 8 nhánh cong tỏa hai bên (chức năng → thao tác), kéo/zoom được */
 :root {
-  --bg: #f4f6fb;
-  --surface: #ffffff;
-  --ink: #16203a;
-  --muted: #5a6680;
-  --line: #d5dbe8;
-  --accent: #1d4ed8;
-  --accent-soft: #e6edfd;
-  --b1: #2a78d6; --b2: #1d4ed8; --b3: #1baf7a; --b4: #eb6834;
-  --b5: #4a3aa7; --b6: #008300; --b7: #c98a00; --b8: #d4568a;
-  --f-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
-  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --bg: #f6f7fb;
+  --paper: #ffffff;
+  --ink: #18213a;
+  --muted: #5d6882;
+  --line: #d9deea;
+  --hub: #1d4ed8;
+  --on-hub: #ffffff;
+  --on-branch: #ffffff;
+  --b1: #2a78d6; --b2: #1d4ed8; --b3: #12a06c; --b4: #e05f2a;
+  --b5: #5b48c4; --b6: #0b8a3a; --b7: #c48600; --b8: #cf4f86;
+  --f: "Be Vietnam Pro", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1420; --surface: #171e2e; --ink: #e6ebf5; --muted: #9aa6bf; --line: #2b3550;
-    --accent: #7aa2ff; --accent-soft: #1d2a4a;
-    --b1: #5aa0f0; --b2: #7aa2ff; --b3: #3fcf98; --b4: #f58a5c;
-    --b5: #9d8ff0; --b6: #4cc24c; --b7: #f0b93a; --b8: #f08ab4;
+    --bg: #0e131f; --paper: #151c2c; --ink: #e7ecf6; --muted: #9ba7c0; --line: #2a3450;
+    --hub: #7aa2ff; --on-hub: #0e131f; --on-branch: #0e131f;
+    --b1: #62a6f2; --b2: #7aa2ff; --b3: #3fd09b; --b4: #f5915f;
+    --b5: #a596f5; --b6: #52c96f; --b7: #f2bd45; --b8: #f290bb;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1420; --surface: #171e2e; --ink: #e6ebf5; --muted: #9aa6bf; --line: #2b3550;
-  --accent: #7aa2ff; --accent-soft: #1d2a4a;
-  --b1: #5aa0f0; --b2: #7aa2ff; --b3: #3fcf98; --b4: #f58a5c;
-  --b5: #9d8ff0; --b6: #4cc24c; --b7: #f0b93a; --b8: #f08ab4;
+  --bg: #0e131f; --paper: #151c2c; --ink: #e7ecf6; --muted: #9ba7c0; --line: #2a3450;
+  --hub: #7aa2ff; --on-hub: #0e131f; --on-branch: #0e131f;
+  --b1: #62a6f2; --b2: #7aa2ff; --b3: #3fd09b; --b4: #f5915f;
+  --b5: #a596f5; --b6: #52c96f; --b7: #f2bd45; --b8: #f290bb;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
-.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; }
-h1, h2, h3 { text-wrap: balance; margin: 0; }
-a { color: inherit; }
-a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-code, .code { font-family: var(--f-mono); font-size: .86em; background: var(--accent-soft); padding: 1px 6px; border-radius: 5px; }
-
-header.top { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: end; justify-content: space-between; margin-bottom: 22px; }
-header.top h1 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 800; letter-spacing: -.01em; }
-header.top p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px; }
-.role { display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; font-weight: 600; letter-spacing: .02em;
-  padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); white-space: nowrap; }
-.role::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--rc, var(--muted)); }
-.r-all { --rc: var(--muted); } .r-qlts { --rc: var(--b2); } .r-kk { --rc: var(--b5); } .r-bgh { --rc: var(--b7); } .r-ad { --rc: var(--b4); }
-
-/* ---------- Sơ đồ ---------- */
-.map { display: grid; grid-template-columns: 1fr minmax(220px, 260px) 1fr; gap: 0; align-items: center; }
-.side { display: grid; gap: 14px; }
-.hubcol { position: relative; align-self: stretch; display: grid; align-items: center; }
-.hubcol::before, .hubcol::after { content: ""; position: absolute; top: 8%; bottom: 8%; width: 2px; background: var(--line); }
-.hubcol::before { left: 0; } .hubcol::after { right: 0; }
-.hub { margin: 0 22px; position: relative; z-index: 1; text-align: center; padding: 22px 18px; border-radius: 18px;
-  background: var(--accent); color: #fff; box-shadow: 0 10px 30px -12px rgba(29,78,216,.55); }
-:root[data-theme="dark"] .hub { color: #0f1420; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hub { color: #0f1420; } }
-.hub .eyebrow { font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; opacity: .85; font-weight: 600; }
-.hub h2 { font-size: 1.25rem; font-weight: 800; margin-top: 4px; }
-.hub p { margin: 8px 0 0; font-size: .82rem; opacity: .9; }
-
-.branch { --c: var(--b1); position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
-.side.left .branch::after, .side.right .branch::before { content: ""; position: absolute; top: 26px; width: 24px; height: 2px; background: var(--c); }
-.side.left .branch::after { right: -25px; }
-.side.right .branch::before { left: -25px; }
-.side.left { padding-right: 24px; } .side.right { padding-left: 24px; }
-.bhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.bhead h3 { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-.bhead h3::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--c); flex: none; }
-.nodes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.node { text-decoration: none; font-size: .82rem; font-weight: 500; padding: 5px 10px; border-radius: 8px;
-  background: color-mix(in srgb, var(--c) 11%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 30%, var(--surface)); }
-.node:hover { background: color-mix(in srgb, var(--c) 20%, var(--surface)); }
-.node small { color: var(--muted); font-weight: 400; }
-
-.c1 { --c: var(--b1); } .c2 { --c: var(--b2); } .c3 { --c: var(--b3); } .c4 { --c: var(--b4); }
-.c5 { --c: var(--b5); } .c6 { --c: var(--b6); } .c7 { --c: var(--b7); } .c8 { --c: var(--b8); }
-
-@media (max-width: 1000px) {
-  .map { grid-template-columns: 1fr; gap: 14px; }
-  .hubcol { order: -1; } .hubcol::before, .hubcol::after { display: none; }
-  .hub { margin: 0; }
-  .side.left, .side.right { padding: 0; }
-  .side.left .branch::after, .side.right .branch::before { display: none; }
-}
-
-/* ---------- Quy trình chính ---------- */
-.flow { margin-top: 34px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
-.flow h2, .guide > h2 { font-size: 1.15rem; font-weight: 700; }
-.flow > p { color: var(--muted); margin: 4px 0 14px; font-size: .9rem; }
-.steps { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; list-style: none; padding: 0; margin: 0; counter-reset: s; }
-.steps li { counter-increment: s; flex: 1 1 150px; min-width: 0; position: relative; padding: 10px 12px 10px 40px; border-radius: 10px;
-  background: var(--accent-soft); font-size: .85rem; }
-.steps li::before { content: counter(s); position: absolute; left: 10px; top: 9px; width: 22px; height: 22px; border-radius: 50%;
-  background: var(--accent); color: var(--surface); font-weight: 700; font-size: .75rem; display: grid; place-items: center; }
-.steps b { display: block; font-size: .88rem; }
-
-/* ---------- Hướng dẫn ---------- */
-.guide { margin-top: 34px; }
-.guide > p { color: var(--muted); margin: 4px 0 18px; font-size: .9rem; }
-.gsec { margin-top: 22px; }
-.gsec > h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 1.05rem; padding-bottom: 8px; border-bottom: 2px solid var(--c); }
-.gsec > h3 span.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; margin-top: 12px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; scroll-margin-top: 16px; }
-.card:target { outline: 2px solid var(--c); }
-.card h4 { margin: 0; font-size: .95rem; font-weight: 700; }
-.card .path { margin: 2px 0 8px; font-size: .78rem; color: var(--muted); }
-.card ol { margin: 0; padding-left: 20px; font-size: .88rem; display: grid; gap: 3px; }
-.card .tip { margin: 10px 0 0; font-size: .82rem; color: var(--muted); padding: 7px 10px; border-radius: 8px; background: var(--bg); }
-.card .tip b { color: var(--ink); }
-footer { margin-top: 36px; color: var(--muted); font-size: .8rem; text-align: center; }
-@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f); font-size: 14px; display: flex; flex-direction: column; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding-inline: 16px; padding-block: 12px; }
+.bar h1 { margin: 0; font-size: 1.15rem; font-weight: 800; text-wrap: balance; }
+.bar p { margin: 2px 0 0; color: var(--muted); font-size: .82rem; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tools button { font: inherit; font-size: .82rem; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 11px; cursor: pointer; }
+.tools button:hover { border-color: var(--hub); }
+.tools button[aria-pressed="true"] { background: var(--hub); color: var(--on-hub); border-color: var(--hub); }
+.tools button:focus-visible { outline: 2px solid var(--hub); outline-offset: 2px; }
+.stage { flex: 1; min-height: 420px; position: relative; margin-inline: 16px; margin-bottom: 12px; background: var(--paper);
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.stage svg { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; user-select: none; }
+.stage svg.drag { cursor: grabbing; }
+/* SVG */
+.edge { fill: none; stroke-linecap: round; }
+.t-branch { font-weight: 700; font-size: 16px; fill: var(--on-branch); }
+.t-role { font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
+.t-feat { font-weight: 700; font-size: 14.5px; fill: var(--ink); }
+.t-leaf { font-size: 13px; fill: var(--ink); }
+.t-hub1 { font-weight: 800; font-size: 19px; fill: var(--on-hub); letter-spacing: .02em; }
+.t-hub2 { font-size: 12.5px; fill: var(--on-hub); opacity: .9; }
+.bnode { cursor: pointer; }
+.bnode:focus-visible rect { stroke: var(--ink); stroke-width: 2.5; }
+.bnode .more { font-size: 12px; font-weight: 700; fill: var(--on-branch); }
+@media print { .bar .tools { display: none; } .stage { border: 0; } }
 </style>
 </head>
 <body>
 
-<div class="wrap">
-  <header class="top">
-    <div>
-      <h1>Sơ đồ tính năng QLTS Tân Phú</h1>
-      <p>Ứng dụng quản lý thiết bị, tài sản của Trường TH‑THCS‑THPT Tân Phú. Dữ liệu lưu trên SharePoint. Bấm vào một ô chức năng để xem các bước thao tác.</p>
-    </div>
-    <div class="legend" aria-label="Vai trò được thấy menu">
-      <span class="role r-all">Mọi người dùng</span>
-      <span class="role r-qlts">Ban quản lý tài sản</span>
-      <span class="role r-kk">Ban kiểm kê</span>
-      <span class="role r-bgh">Ban giám hiệu</span>
-      <span class="role r-ad">Quản trị hệ thống</span>
-    </div>
-  </header>
-
-  <!-- ============ SƠ ĐỒ TƯ DUY ============ -->
-  <section class="map" aria-label="Sơ đồ tư duy các tính năng">
-    <div class="side left">
-      <div class="branch c1">
-        <div class="bhead"><h3>Đăng nhập &amp; Trang chủ</h3><span class="role r-all">Mọi người</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-login">Đăng nhập bằng mã OTP</a>
-          <a class="node" href="#g-account">Tài khoản: Làm mới / Đăng xuất</a>
-          <a class="node" href="#g-home">Trang chủ: số liệu &amp; lối tắt</a>
-        </div>
-      </div>
-      <div class="branch c2">
-        <div class="bhead"><h3>Ban quản lý tài sản</h3><span class="role r-qlts">QLTS</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-ds">Danh sách thiết bị</a>
-          <a class="node" href="#g-ds-import">Nhập / xuất Excel</a>
-          <a class="node" href="#g-new">Nhập mới thiết bị</a>
-          <a class="node" href="#g-edit">Chỉnh sửa <small>(bấm dòng → popup)</small></a>
-          <a class="node" href="#g-move">Điều chuyển</a>
-          <a class="node" href="#g-move-bb">Biên bản bàn giao (Word/PDF)</a>
-        </div>
-      </div>
-      <div class="branch c3">
-        <div class="bhead"><h3>Bàn giao</h3><span class="role r-qlts">QLTS</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-bg-view">Tài sản hiện có (gom nhóm)</a>
-          <a class="node" href="#g-bg-check">Đối chiếu tổng số</a>
-          <a class="node" href="#g-bg-export">Biên bản theo phòng <small>Excel · PDF</small></a>
-        </div>
-      </div>
-      <div class="branch c4">
-        <div class="bhead"><h3>Thanh lý</h3><span class="role r-qlts">QLTS</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-tl-new">Lập thanh lý</a>
-          <a class="node" href="#g-tl-forms">Kế hoạch &amp; Tờ trình</a>
-          <a class="node" href="#g-tl-done">Xác nhận thanh lý</a>
-          <a class="node" href="#g-tl-history">Các đợt / Tài sản đã thanh lý</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="hubcol">
-      <div class="hub">
-        <div class="eyebrow">qltstanphu.streamlit.app</div>
-        <h2>Quản lý thiết bị Tân Phú</h2>
-        <p>SharePoint · Power Automate<br>Menu ngang phía trên, hiện theo vai trò</p>
-      </div>
-    </div>
-
-    <div class="side right">
-      <div class="branch c5">
-        <div class="bhead"><h3>Ban kiểm kê</h3><span class="role r-kk">Kiểm kê</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-kk-qty">Kiểm kê: nhập số lượng</a>
-          <a class="node" href="#g-kk-qr">Kiểm kê: quét mã QR</a>
-          <a class="node" href="#g-kk-label">In tem QR</a>
-          <a class="node" href="#g-kk-result">Kết quả kiểm kê</a>
-        </div>
-      </div>
-      <div class="branch c6">
-        <div class="bhead"><h3>Người dùng</h3><span class="role r-all">Mọi người</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-my-rooms">Phòng đang quản lý</a>
-          <a class="node" href="#g-my-confirm">Xác nhận kiểm kê phòng</a>
-        </div>
-      </div>
-      <div class="branch c7">
-        <div class="bhead"><h3>Báo cáo</h3><span class="role r-bgh">BGH</span><span class="role r-qlts">QLTS</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-report">6 tab · 12 bảng thống kê</a>
-          <a class="node" href="#g-report">Biểu đồ cột / tròn / đường</a>
-          <a class="node" href="#g-report-xlsx">Xuất Excel toàn bộ</a>
-        </div>
-      </div>
-      <div class="branch c8">
-        <div class="bhead"><h3>Phân quyền</h3><span class="role r-ad">Quản trị</span></div>
-        <div class="nodes">
-          <a class="node" href="#g-pq-admin">Phân quyền admin</a>
-          <a class="node" href="#g-pq-room">Quản lý phòng <small>+ đồng bộ</small></a>
-          <a class="node" href="#g-xn">Xuất / nhập biểu mẫu</a>
-          <a class="node" href="#g-sp">Kết nối SharePoint</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ VÒNG ĐỜI TÀI SẢN ============ -->
-  <section class="flow" aria-labelledby="flow-h">
-    <h2 id="flow-h">Vòng đời một tài sản trong app</h2>
-    <p>Thứ tự các nghiệp vụ thường gặp, từ lúc mua về đến khi thanh lý.</p>
-    <ol class="steps">
-      <li><b>Nhập mới</b>Ghi tài sản, số lượng, nơi sử dụng</li>
-      <li><b>Bàn giao</b>In biên bản cho từng phòng</li>
-      <li><b>Điều chuyển</b>Đổi phòng, in biên bản</li>
-      <li><b>Kiểm kê</b>Đếm số lượng hoặc quét QR</li>
-      <li><b>Xác nhận</b>Quản lý phòng đồng ý kết quả</li>
-      <li><b>Báo cáo</b>BGH xem thống kê</li>
-      <li><b>Thanh lý</b>Lập hồ sơ, chuyển “Đã thanh lý”</li>
-    </ol>
-  </section>
-
-  <!-- ============ HƯỚNG DẪN THAO TÁC ============ -->
-  <section class="guide" aria-labelledby="guide-h">
-    <h2 id="guide-h">Hướng dẫn thao tác</h2>
-    <p>Đường dẫn menu ghi theo dạng <b>Nhóm → Trang → Tab</b>. Các nút có tên giống hệt trên app.</p>
-
-    <div class="gsec c1">
-      <h3><span class="dot"></span>Đăng nhập &amp; Trang chủ <span class="role r-all">Mọi người</span></h3>
-      <div class="cards">
-        <article class="card" id="g-login">
-          <h4>Đăng nhập bằng mã OTP</h4>
-          <div class="path">Màn hình đầu tiên khi mở app</div>
-          <ol>
-            <li>Nhập email trường: <span class="code">@igcschool.edu.vn</span> hoặc <span class="code">@igc.edu.vn</span>.</li>
-            <li>Bấm gửi mã, mở hộp thư và lấy mã đăng nhập.</li>
-            <li>Nhập mã vào app để vào hệ thống.</li>
-          </ol>
-          <p class="tip"><b>Lưu ý:</b> chỉ email đã được cấp quyền mới đăng nhập được. App ghi nhớ đăng nhập trên trình duyệt, tải lại trang không phải nhập lại. Nếu bị thu hồi quyền, app tự đăng xuất.</p>
-        </article>
-        <article class="card" id="g-account">
-          <h4>Tài khoản: Làm mới dữ liệu / Đăng xuất</h4>
-          <div class="path">Nút “Tài khoản” ở góc phải thanh tiêu đề</div>
-          <ol>
-            <li>Bấm <b>Tài khoản</b>.</li>
-            <li><b>Làm mới dữ liệu</b>: đọc lại dữ liệu mới nhất từ SharePoint (khi người khác vừa sửa).</li>
-            <li><b>Đăng xuất</b>: thoát và xóa ghi nhớ trên máy này.</li>
-          </ol>
-          <p class="tip"><b>Dùng máy chung:</b> luôn đăng xuất sau khi làm việc.</p>
-        </article>
-        <article class="card" id="g-home">
-          <h4>Trang chủ</h4>
-          <div class="path">Trang chủ</div>
-          <ol>
-            <li>Xem nhanh số thiết bị, số phòng của bạn và số liệu toàn trường.</li>
-            <li>Bấm các ô lối tắt để đi thẳng tới chức năng được phân quyền.</li>
-          </ol>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c2">
-      <h3><span class="dot"></span>Ban quản lý tài sản <span class="role r-qlts">QLTS</span></h3>
-      <div class="cards">
-        <article class="card" id="g-ds">
-          <h4>Danh sách thiết bị: xem &amp; sửa nhanh</h4>
-          <div class="path">Ban quản lý tài sản → Danh sách thiết bị → Xem &amp; sửa</div>
-          <ol>
-            <li>Lọc / tìm thiết bị, chọn <b>Cột hiển thị</b> nếu cần.</li>
-            <li>Sửa trực tiếp trong bảng rồi bấm lưu, app chỉ ghi những ô đã thay đổi.</li>
-            <li>Bật <b>Hiện cả tài sản đã thanh lý</b> để xem cả tài sản đã thanh lý.</li>
-            <li><b>Tải toàn bộ danh sách (Excel)</b> khi cần gửi đi.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-ds-import">
-          <h4>Nhập thiết bị từ file Excel</h4>
-          <div class="path">Danh sách thiết bị → Nhập / xuất Excel</div>
-          <ol>
-            <li><b>Tải file mẫu để nhập</b> và điền dữ liệu.</li>
-            <li>Chọn file <span class="code">.xlsx</span> / <span class="code">.csv</span> để tải lên.</li>
-            <li>Xem trước: số dòng thêm mới, dòng cập nhật, dòng giống hệt, và mở <b>Xem … thay đổi</b>.</li>
-            <li>Bấm <b>Nhập vào SharePoint</b> và chờ thanh tiến trình chạy xong.</li>
-          </ol>
-          <p class="tip"><b>Ghi đè an toàn:</b> chỉ ô khác dữ liệu hiện có mới được ghi; ô trống trong file không xóa dữ liệu cũ. Dòng nhận biết theo <b>Mã chi tiết</b>.</p>
-        </article>
-        <article class="card" id="g-new">
-          <h4>Nhập mới thiết bị</h4>
-          <div class="path">Ban quản lý tài sản → Nhập mới thiết bị</div>
-          <ol>
-            <li>Chọn <b>Mã tài sản</b> có sẵn (tự điền thông tin) hoặc tạo mã mới.</li>
-            <li>Chọn <b>Nơi sử dụng</b>, nhóm, tình trạng, ĐVT, ngày mua, giá…</li>
-            <li>Nhập số lượng: app tự sinh Mã chi tiết dạng <span class="code">123456-01</span>, <span class="code">123456-02</span>…</li>
-            <li>Bấm <b>Lưu … thiết bị</b>.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-edit">
-          <h4>Chỉnh sửa / xóa thiết bị</h4>
-          <div class="path">Ban quản lý tài sản → Chỉnh sửa thông tin thiết bị</div>
-          <ol>
-            <li>Tìm thiết bị, <b>bấm vào một dòng</b> bất kỳ: popup chỉnh sửa hiện ra.</li>
-            <li>Sửa thông tin rồi bấm <b>Lưu thay đổi</b>.</li>
-            <li>Muốn xóa: bấm <b>Xóa thiết bị này</b> (nút đỏ) và xác nhận lần nữa.</li>
-          </ol>
-          <p class="tip"><b>Lưu ý:</b> xóa là xóa hẳn trên SharePoint. Tài sản hỏng / bỏ đi nên dùng <b>Thanh lý</b> để giữ lịch sử.</p>
-        </article>
-        <article class="card" id="g-move">
-          <h4>Điều chuyển thiết bị</h4>
-          <div class="path">Ban quản lý tài sản → Điều chuyển thiết bị</div>
-          <ol>
-            <li>Chọn <b>Từ nơi sử dụng</b>.</li>
-            <li>Tick các thiết bị cần chuyển ở đầu dòng.</li>
-            <li>Chọn <b>Đến nơi sử dụng</b>, <b>Ngày điều chuyển</b>, ghi chú.</li>
-            <li>Bấm <b>Điều chuyển … thiết bị</b>: app cập nhật nơi sử dụng và ghi lịch sử.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-move-bb">
-          <h4>In biên bản nghiệm thu – bàn giao</h4>
-          <div class="path">Điều chuyển thiết bị → phần Biên bản bàn giao</div>
-          <ol>
-            <li>Chọn nguồn thiết bị: vừa chọn ở bảng trên, hoặc tick dòng trong <b>Lịch sử điều chuyển</b>.</li>
-            <li>Chọn <b>người bàn giao</b> và <b>người nhận</b> trong danh sách người dùng.</li>
-            <li>Chỉnh <b>Ngày bàn giao</b>, địa điểm.</li>
-            <li>Tải biên bản <b>Word</b> (theo mẫu của trường) hoặc <b>PDF</b>.</li>
-          </ol>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c3">
-      <h3><span class="dot"></span>Bàn giao <span class="role r-qlts">QLTS</span></h3>
-      <div class="cards">
-        <article class="card" id="g-bg-view">
-          <h4>Xem tài sản hiện có theo vị trí</h4>
-          <div class="path">Bàn giao → Bàn giao tài sản → Tài sản hiện có</div>
-          <ol>
-            <li>Lọc theo <b>Vị trí tài sản</b> và <b>Nhóm tài sản</b>.</li>
-            <li>Bảng gom các thiết bị cùng Mã tài sản, Quy cách, Tình trạng và cộng số lượng.</li>
-            <li><b>Tải bảng này (Excel)</b>, font Times New Roman theo mẫu HC/QT–02/M03.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-bg-check">
-          <h4>Đối chiếu tổng số</h4>
-          <div class="path">Tài sản hiện có → Đối chiếu với tổng số trên SharePoint</div>
-          <ol>
-            <li>Mở mục đối chiếu để thấy: số thiết bị trên SharePoint, tổng số lượng, số dòng sau khi gom, số vị trí.</li>
-            <li>Dùng khi số trên bảng gom khác tổng số thiết bị.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-bg-export">
-          <h4>Xuất biên bản bàn giao theo phòng</h4>
-          <div class="path">Bàn giao tài sản → Xuất biên bản bàn giao</div>
-          <ol>
-            <li>Chọn các <b>Phòng</b> và <b>Ngày bàn giao (mặc định)</b>.</li>
-            <li>Chọn thành viên bên giao; đại diện phòng tự lấy theo người quản lý và chức vụ.</li>
-            <li>Sửa ngày bàn giao riêng cho từng phòng trong bảng nếu cần.</li>
-            <li>Xem trước, rồi tải <b>Excel</b> (mỗi phòng 1 sheet) hoặc <b>PDF</b> (mỗi phòng sang trang mới).</li>
-          </ol>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c4">
-      <h3><span class="dot"></span>Thanh lý <span class="role r-qlts">QLTS</span></h3>
-      <div class="cards">
-        <article class="card" id="g-tl-new">
-          <h4>Lập danh sách thanh lý</h4>
-          <div class="path">Thanh lý → Thanh lý tài sản → Lập thanh lý</div>
-          <ol>
-            <li>Đặt <b>Tên đợt thanh lý</b>, <b>Số tờ trình</b>, trích yếu và người ký.</li>
-            <li>Lọc và tick tài sản, bấm <b>Thêm … tài sản vào danh sách thanh lý</b>.</li>
-            <li>Sửa giá trị còn lại, dự kiến xử lý; tick <b>Bỏ</b> để loại dòng chọn nhầm.</li>
-          </ol>
-          <p class="tip"><b>Lần đầu:</b> nếu báo thiếu list ThanhLy, bấm <b>Tạo list ThanhLy tự động</b>.</p>
-        </article>
-        <article class="card" id="g-tl-forms">
-          <h4>In Kế hoạch &amp; Tờ trình</h4>
-          <div class="path">Lập thanh lý → phần biểu mẫu</div>
-          <ol>
-            <li><b>Biểu mẫu 1 – Kế hoạch thanh lý</b>: tải Excel hoặc PDF.</li>
-            <li><b>Biểu mẫu 2 – Tờ trình phê duyệt thanh lý</b>: tải Word hoặc PDF.</li>
-            <li>Trình ký trước khi xác nhận thanh lý.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-tl-done">
-          <h4>Xác nhận thanh lý</h4>
-          <div class="path">Lập thanh lý → Xác nhận thanh lý</div>
-          <ol>
-            <li>Kiểm tra lại danh sách đợt.</li>
-            <li>Bấm <b>Xác nhận thanh lý</b> và đồng ý ở hộp hỏi lại.</li>
-            <li>Tài sản chuyển tình trạng <b>Đã thanh lý</b>, ẩn khỏi các danh sách chung, và được lưu vào list ThanhLy theo đợt.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-tl-history">
-          <h4>Tra lại các đợt đã thanh lý</h4>
-          <div class="path">Thanh lý → tab Các đợt thanh lý / Tài sản đã thanh lý</div>
-          <ol>
-            <li>Chọn đợt để xem danh sách, <b>Tải danh sách đợt này (Excel)</b>, in lại biểu mẫu.</li>
-            <li>Tab <b>Tài sản đã thanh lý</b> liệt kê mọi tài sản đã ra khỏi sổ.</li>
-          </ol>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c5">
-      <h3><span class="dot"></span>Ban kiểm kê <span class="role r-kk">Kiểm kê</span></h3>
-      <div class="cards">
-        <article class="card" id="g-kk-qty">
-          <h4>Kiểm kê bằng cách nhập số lượng</h4>
-          <div class="path">Ban kiểm kê → Kiểm kê → Thực hiện kiểm kê</div>
-          <ol>
-            <li>Chọn <b>Đợt kiểm kê</b> (hoặc tạo đợt mới) và <b>Nơi sử dụng</b>.</li>
-            <li>Phương án kiểm kê: <b>Nhập số lượng</b>.</li>
-            <li>Nhập số lượng thực tế, tình trạng, ghi chú cho từng nhóm thiết bị.</li>
-            <li><b>Lưu tạm</b> nếu chưa xong, hoặc <b>Xác nhận kiểm kê</b> khi hoàn tất.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-kk-qr">
-          <h4>Kiểm kê bằng quét mã QR</h4>
-          <div class="path">Thực hiện kiểm kê → Phương án: Quét mã QR</div>
-          <ol>
-            <li>Chọn đợt, phòng, phương án <b>Quét mã QR</b>. Mỗi phòng trong cùng đợt có thể chọn phương án riêng.</li>
-            <li>Bật camera và đưa tem vào khung; dùng đèn / zoom nếu tối hoặc tem nhỏ.</li>
-            <li>Hoặc dùng <b>máy quét QR</b>: bấm vào ô “Hoặc nhập / quét mã bằng súng quét rồi nhấn Enter” rồi quét liên tục.</li>
-            <li>Theo dõi số đã quét / chưa thấy; quét nhầm thì <b>Bỏ mã</b>.</li>
-            <li><b>Lưu tạm</b> hoặc <b>Xác nhận kiểm kê</b>: số lượng tính theo mã đã quét.</li>
-          </ol>
-          <p class="tip"><b>Máy quét:</b> loại 2D, chế độ bàn phím (HID), hậu tố Enter, bàn phím US. Tắt bộ gõ tiếng Việt khi quét.</p>
-        </article>
-        <article class="card" id="g-kk-label">
-          <h4>In tem QR dán thiết bị</h4>
-          <div class="path">Phương án Quét mã QR → Tải tem QR</div>
-          <ol>
-            <li>Chọn phòng, bấm <b>Tải tem QR</b> (PDF A4, 24 tem/trang).</li>
-            <li>In ra giấy decal, dán đúng thiết bị theo Mã chi tiết in dưới tem.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-kk-result">
-          <h4>Xem kết quả kiểm kê</h4>
-          <div class="path">Ban kiểm kê → Kiểm kê → Kết quả kiểm kê</div>
-          <ol>
-            <li>Chọn <b>Đợt kiểm kê</b> để xem kết quả các phòng và trạng thái xác nhận.</li>
-            <li><b>Tải Excel</b> để lưu hồ sơ.</li>
-          </ol>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c6">
-      <h3><span class="dot"></span>Người dùng <span class="role r-all">Mọi người</span></h3>
-      <div class="cards">
-        <article class="card" id="g-my-rooms">
-          <h4>Danh sách phòng đang quản lý</h4>
-          <div class="path">Người dùng → Danh sách Phòng đang quản lý</div>
-          <ol>
-            <li>Xem các phòng bạn phụ trách và thiết bị trong từng phòng.</li>
-            <li><b>Tải danh sách thiết bị (Excel)</b>.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-my-confirm">
-          <h4>Xác nhận kết quả kiểm kê phòng</h4>
-          <div class="path">Người dùng → Kiểm kê</div>
-          <ol>
-            <li>Chọn đợt và phòng của bạn, xem kết quả Ban kiểm kê đã ghi.</li>
-            <li>Chọn ý kiến: <b>Đồng ý</b> hoặc <b>Không đồng ý</b>.</li>
-            <li>Nếu không đồng ý, ghi rõ lý do vào <b>Ghi chú</b> (bắt buộc).</li>
-            <li>Bấm <b>Gửi xác nhận</b>.</li>
-          </ol>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c7">
-      <h3><span class="dot"></span>Báo cáo <span class="role r-bgh">BGH</span><span class="role r-qlts">QLTS</span></h3>
-      <div class="cards">
-        <article class="card" id="g-report">
-          <h4>Báo cáo tổng quan BGH</h4>
-          <div class="path">Báo cáo → Báo cáo tổng quan BGH</div>
-          <ol>
-            <li>Lọc theo <b>Nhóm thiết bị</b> và <b>Nơi sử dụng</b> (để trống = toàn trường).</li>
-            <li>Xem 4 chỉ số: Thiết bị đang sử dụng · Tổng giá trị · Cần kiểm tra / sửa / thanh lý · Đã thanh lý.</li>
-            <li>Chuyển giữa 6 tab: Theo nhóm &amp; tình trạng · Theo nơi sử dụng &amp; người quản lý · Theo loại tài sản · Theo thời gian &amp; giá trị · Kiểm kê – Điều chuyển – Thanh lý · Chất lượng dữ liệu.</li>
-            <li>Mỗi tab có biểu đồ cột / tròn / đường kèm bảng số liệu.</li>
-          </ol>
-        </article>
-        <article class="card" id="g-report-xlsx">
-          <h4>Xuất báo cáo</h4>
-          <div class="path">Báo cáo tổng quan BGH → cuối trang</div>
-          <ol>
-            <li>Bấm <b>Xuất toàn bộ báo cáo (Excel, mỗi bảng 1 sheet)</b>.</li>
-            <li>File có đủ 12 bảng thống kê theo bộ lọc đang chọn.</li>
-          </ol>
-          <p class="tip"><b>Mẹo:</b> tab <b>Chất lượng dữ liệu</b> chỉ ra thiết bị thiếu Mã SAP, ngày mua, giá trị, nơi sử dụng, người quản lý hoặc trùng Mã chi tiết, để sửa trước khi báo cáo.</p>
-        </article>
-      </div>
-    </div>
-
-    <div class="gsec c8">
-      <h3><span class="dot"></span>Phân quyền <span class="role r-ad">Quản trị</span></h3>
-      <div class="cards">
-        <article class="card" id="g-pq-admin">
-          <h4>Phân quyền admin</h4>
-          <div class="path">Phân quyền → Phân quyền admin</div>
-          <ol>
-            <li>Nhập email, chọn <b>Vai trò</b>, bấm <b>Thêm</b>.</li>
-            <li>Bấm vào một dòng để sửa vai trò, rồi <b>Lưu thay đổi</b>.</li>
-            <li>Tick các dòng và thu hồi để bỏ quyền; app hỏi lại trước khi thu hồi.</li>
-          </ol>
-          <p class="tip"><b>Vai trò:</b> Quản trị hệ thống · Ban quản lý tài sản · Ban kiểm kê · Ban giám hiệu.</p>
-        </article>
-        <article class="card" id="g-pq-room">
-          <h4>Phân quyền quản lý phòng</h4>
-          <div class="path">Phân quyền → Phân quyền quản lý phòng</div>
-          <ol>
-            <li><b>Thêm phòng</b>: mã phòng, tên, người quản lý.</li>
-            <li>Đổi người quản lý rồi <b>Lưu thay đổi</b>: cột Quản lý phòng của mọi thiết bị trong phòng tự cập nhật theo.</li>
-            <li>Nếu có thiết bị lệch người quản lý, bấm <b>Đồng bộ …</b> để sửa một lần.</li>
-            <li>Tick phòng để xóa (có hỏi lại).</li>
-          </ol>
-        </article>
-        <article class="card" id="g-xn">
-          <h4>Xuất / nhập biểu mẫu</h4>
-          <div class="path">Phân quyền → Xuất / nhập biểu mẫu</div>
-          <ol>
-            <li>Chọn list: Thiết bị, Phòng, Điều chuyển, Kiểm kê, Phân quyền, Thanh lý.</li>
-            <li>Tải biểu mẫu trống hoặc xuất dữ liệu hiện có.</li>
-            <li>Tải file lên, xem thay đổi và lỗi, rồi bấm <b>Nhập …</b>.</li>
-          </ol>
-          <p class="tip"><b>Đối chiếu:</b> app báo dòng trùng, dòng thừa trên SharePoint so với file để dọn dữ liệu.</p>
-        </article>
-        <article class="card" id="g-sp">
-          <h4>Kết nối SharePoint</h4>
-          <div class="path">Phân quyền → Kết nối SharePoint</div>
-          <ol>
-            <li><b>Kiểm tra truy cập site và các list</b>.</li>
-            <li><b>Ghi thử 1 dòng (rồi xóa)</b> để chắc chắn ghi được.</li>
-            <li><b>Gửi thử email cho tôi</b> để kiểm tra luồng gửi mã OTP.</li>
-            <li>Nếu thiếu list, bấm <b>Tạo list còn thiếu</b>.</li>
-          </ol>
-          <p class="tip"><b>Khi lỗi:</b> lỗi 403 thường do key hoặc điều kiện email trong flow; “trigger is not enabled” nghĩa là flow đang tắt.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <footer>Trường TH‑THCS‑THPT Tân Phú · Ứng dụng quản lý thiết bị · Menu hiển thị tùy theo vai trò được phân quyền</footer>
+<div class="bar">
+  <div>
+    <h1>Sơ đồ tính năng QLTS Tân Phú</h1>
+    <p>Nhánh menu → chức năng → thao tác · Kéo để di chuyển, cuộn chuột hoặc chụm hai ngón để phóng to, bấm vào nhánh để thu gọn</p>
+  </div>
+  <div class="tools" role="toolbar" aria-label="Điều khiển sơ đồ">
+    <button id="btn-steps" aria-pressed="true">Hiện thao tác</button>
+    <button id="btn-fit">Vừa màn hình</button>
+    <button id="btn-in" aria-label="Phóng to">＋</button>
+    <button id="btn-out" aria-label="Thu nhỏ">－</button>
+  </div>
 </div>
+<div class="stage" id="stage">
+  <svg id="map" role="img" aria-label="Sơ đồ tư duy các tính năng của ứng dụng quản lý thiết bị"></svg>
+</div>
+
+<script>
+const TREE = [
+  { t: "Đăng nhập & Tài khoản", role: "Mọi người dùng", c: "--b1", kids: [
+    { t: "Đăng nhập bằng mã OTP", kids: ["Nhập email @igcschool.edu.vn / @igc.edu.vn", "Bấm gửi mã → mở email lấy mã", "Nhập mã → vào app (tự ghi nhớ)"] },
+    { t: "Nút Tài khoản (góc phải)", kids: ["Làm mới dữ liệu từ SharePoint", "Đăng xuất khi dùng máy chung"] },
+    { t: "Trang chủ", kids: ["Xem số liệu tổng quan", "Bấm ô lối tắt để mở chức năng"] },
+  ]},
+  { t: "Ban quản lý tài sản", role: "Ban quản lý tài sản", c: "--b2", kids: [
+    { t: "Danh sách thiết bị", kids: ["Lọc, chọn cột hiển thị", "Sửa trực tiếp trong bảng → Lưu", "Bật “Hiện cả tài sản đã thanh lý”", "Tải toàn bộ danh sách (Excel)"] },
+    { t: "Nhập / xuất Excel", kids: ["Tải file mẫu → điền dữ liệu", "Tải file lên → xem trước thay đổi", "Nhập vào SharePoint (chỉ ghi ô khác)"] },
+    { t: "Nhập mới thiết bị", kids: ["Chọn Mã tài sản có sẵn hoặc tạo mới", "Chọn nơi sử dụng, nhóm, giá, ngày mua", "Nhập số lượng → Lưu (tự sinh mã chi tiết)"] },
+    { t: "Chỉnh sửa thiết bị", kids: ["Bấm vào dòng → popup chỉnh sửa", "Sửa → Lưu thay đổi", "Xóa thiết bị này → xác nhận"] },
+    { t: "Điều chuyển thiết bị", kids: ["Chọn Từ nơi sử dụng, tick thiết bị", "Chọn Đến nơi, ngày → Điều chuyển", "Chọn người giao / nhận → biên bản Word, PDF"] },
+  ]},
+  { t: "Bàn giao", role: "Ban quản lý tài sản", c: "--b3", kids: [
+    { t: "Tài sản hiện có", kids: ["Lọc vị trí, nhóm tài sản", "Gom theo mã tài sản, cộng số lượng", "Đối chiếu với tổng trên SharePoint"] },
+    { t: "Xuất biên bản bàn giao", kids: ["Chọn phòng, ngày bàn giao", "Chọn thành viên bên giao", "Sửa ngày riêng cho từng phòng", "Excel: 1 phòng/sheet · PDF: 1 phòng/trang"] },
+  ]},
+  { t: "Thanh lý", role: "Ban quản lý tài sản", c: "--b4", kids: [
+    { t: "Lập thanh lý", kids: ["Đặt tên đợt, số tờ trình", "Tick tài sản → Thêm vào danh sách", "Sửa giá trị còn lại, bỏ dòng nhầm"] },
+    { t: "In biểu mẫu", kids: ["Kế hoạch thanh lý (Excel, PDF)", "Tờ trình phê duyệt (Word, PDF)"] },
+    { t: "Xác nhận thanh lý", kids: ["Bấm Xác nhận thanh lý → đồng ý", "Tài sản thành “Đã thanh lý”, ẩn khỏi danh sách"] },
+    { t: "Tra cứu", kids: ["Các đợt thanh lý → tải Excel", "Danh sách tài sản đã thanh lý"] },
+  ]},
+  { t: "Ban kiểm kê", role: "Ban kiểm kê", c: "--b5", kids: [
+    { t: "Chọn đợt & phòng", kids: ["Chọn đợt có sẵn hoặc tạo đợt mới", "Chọn nơi sử dụng", "Chọn phương án riêng cho từng phòng"] },
+    { t: "Nhập số lượng", kids: ["Nhập số thực tế, tình trạng, ghi chú", "Lưu tạm hoặc Xác nhận kiểm kê"] },
+    { t: "Quét mã QR", kids: ["Tải tem QR (PDF 24 tem/trang) → dán", "Quét bằng camera (đèn, zoom)", "Hoặc máy quét QR vào ô nhập mã", "Bỏ mã quét nhầm → Xác nhận kiểm kê"] },
+    { t: "Kết quả kiểm kê", kids: ["Chọn đợt → xem các phòng", "Tải Excel"] },
+  ]},
+  { t: "Người dùng", role: "Mọi người dùng", c: "--b6", kids: [
+    { t: "Phòng đang quản lý", kids: ["Xem thiết bị phòng mình", "Tải danh sách (Excel)"] },
+    { t: "Xác nhận kiểm kê phòng", kids: ["Chọn đợt, phòng", "Đồng ý / Không đồng ý (+ ghi chú)", "Bấm Gửi xác nhận"] },
+  ]},
+  { t: "Báo cáo", role: "Ban giám hiệu · QLTS", c: "--b7", kids: [
+    { t: "Bộ lọc", kids: ["Nhóm thiết bị, nơi sử dụng"] },
+    { t: "4 chỉ số", kids: ["Đang dùng · Tổng giá trị", "Cần sửa / thanh lý · Đã thanh lý"] },
+    { t: "6 tab · 12 bảng", kids: ["Nhóm & tình trạng", "Nơi sử dụng & người quản lý", "Loại tài sản · Thời gian & giá trị", "Kiểm kê – Điều chuyển – Thanh lý", "Chất lượng dữ liệu"] },
+    { t: "Biểu đồ", kids: ["Cột · Tròn · Đường"] },
+    { t: "Xuất Excel", kids: ["Toàn bộ báo cáo, mỗi bảng 1 sheet"] },
+  ]},
+  { t: "Phân quyền", role: "Quản trị hệ thống", c: "--b8", kids: [
+    { t: "Phân quyền admin", kids: ["Thêm email + vai trò", "Bấm dòng để sửa vai trò", "Tick → thu hồi quyền"] },
+    { t: "Quản lý phòng", kids: ["Thêm phòng, người quản lý", "Đổi quản lý → tự đồng bộ thiết bị", "Đồng bộ thiết bị bị lệch"] },
+    { t: "Xuất / nhập biểu mẫu", kids: ["Tải mẫu, xuất dữ liệu 6 list", "Nhập file → chỉ ghi ô thay đổi", "Đối chiếu dòng trùng / thừa"] },
+    { t: "Kết nối SharePoint", kids: ["Kiểm tra truy cập · Ghi thử 1 dòng", "Gửi thử email", "Tạo list còn thiếu"] },
+  ]},
+];
+const RIGHT = [0, 1, 2, 3], LEFT = [4, 5, 6, 7];
+
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("map");
+const cvs = document.createElement("canvas").getContext("2d");
+const FONT = getComputedStyle(document.body).fontFamily;
+const measure = (txt, size, weight) => { cvs.font = `${weight} ${size}px ${FONT}`; return cvs.measureText(txt).width; };
+const el = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); parent && parent.appendChild(n); return n; };
+
+let showSteps = true;
+const collapsed = new Set();
+try { const s = JSON.parse(localStorage.getItem("qlts-map") || "{}"); if (s.steps === false) showSteps = false; } catch (e) {}
+
+const LEAF_H = 27, FEAT_GAP = 12, BR_GAP = 34, HUB_W = 236, HUB_H = 84;
+
+function layoutSide(idxs, dir) {
+  let y = 0; const out = [];
+  for (const i of idxs) {
+    const b = TREE[i], open = showSteps && !collapsed.has(i), feats = [];
+    for (const f of b.kids) {
+      const leaves = [];
+      if (open) for (const t of f.kids) { leaves.push({ t, y }); y += LEAF_H; }
+      else y += LEAF_H;
+      const fy = open ? (leaves[0].y + leaves[leaves.length - 1].y) / 2 : y - LEAF_H;
+      feats.push({ f, y: fy, leaves });
+      y += open ? FEAT_GAP : 4;
+    }
+    out.push({ i, b, y: (feats[0].y + feats[feats.length - 1].y) / 2, feats });
+    y += BR_GAP;
+  }
+  const shift = (y - BR_GAP) / 2;
+  for (const br of out) { br.y -= shift; for (const fe of br.feats) { fe.y -= shift; for (const l of fe.leaves) l.y -= shift; } }
+  return out;
+}
+
+function curve(x1, y1, x2, y2) {
+  const mx = (x1 + x2) / 2;
+  return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+}
+
+let bbox = null;
+function render() {
+  svg.replaceChildren();
+  const gRoot = el("g", { id: "root" }, svg);
+  const gEdges = el("g", {}, gRoot), gNodes = el("g", {}, gRoot);
+  let minX = -HUB_W / 2, maxX = HUB_W / 2, minY = -HUB_H / 2, maxY = HUB_H / 2;
+
+  for (const [idxs, dir] of [[RIGHT, 1], [LEFT, -1]]) {
+    for (const br of layoutSide(idxs, dir)) {
+      const col = `var(${br.b.c})`;
+      const bw = measure(br.b.t, 16, 700) + 34, bh = 36;
+      const bx = dir * (HUB_W / 2 + 70);              // mép trong của nhánh
+      const bOuter = bx + dir * bw;
+      el("path", { class: "edge", d: curve(dir * (HUB_W / 2 - 18), 0, bx, br.y), stroke: col, "stroke-width": 7 }, gEdges);
+
+      const g = el("g", { class: "bnode", tabindex: 0, role: "button", "aria-label": `${br.b.t}: bấm để thu gọn hoặc mở` }, gNodes);
+      el("rect", { x: Math.min(bx, bOuter), y: br.y - bh / 2, width: bw, height: bh, rx: 18, fill: col }, g);
+      const tt = el("text", { class: "t-branch", x: (bx + bOuter) / 2, y: br.y + 5.5, "text-anchor": "middle" }, g); tt.textContent = br.b.t;
+      const rt = el("text", { class: "t-role", x: (bx + bOuter) / 2, y: br.y + bh / 2 + 15, "text-anchor": "middle", fill: col }, gNodes); rt.textContent = br.b.role;
+      const toggle = () => { collapsed.has(br.i) ? collapsed.delete(br.i) : collapsed.add(br.i); render(); };
+      g.addEventListener("click", e => { if (!moved) toggle(); });
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+
+      for (const fe of br.feats) {
+        const fw = measure(fe.f.t, 14.5, 700) + 14;
+        const fx = bOuter + dir * 46, fOuter = fx + dir * fw;
+        el("path", { class: "edge", d: curve(bOuter, br.y, fx, fe.y), stroke: col, "stroke-width": 3.2 }, gEdges);
+        el("path", { class: "edge", d: `M${fx},${fe.y} L${fOuter},${fe.y}`, stroke: col, "stroke-width": 3.2 }, gEdges);
+        const ft = el("text", { class: "t-feat", x: dir > 0 ? fx + 6 : fx - 6, y: fe.y - 6, "text-anchor": dir > 0 ? "start" : "end" }, gNodes); ft.textContent = fe.f.t;
+        let edgeX = fOuter;
+        if (!fe.leaves.length && !showSteps) {}
+        for (const l of fe.leaves) {
+          const lw = measure(l.t, 13, 400) + 10;
+          const lx = fOuter + dir * 34, lOuter = lx + dir * lw;
+          el("path", { class: "edge", d: curve(fOuter, fe.y, lx, l.y), stroke: col, "stroke-width": 1.4, opacity: .75 }, gEdges);
+          el("path", { class: "edge", d: `M${lx},${l.y} L${lOuter},${l.y}`, stroke: col, "stroke-width": 1.4, opacity: .75 }, gEdges);
+          const lt = el("text", { class: "t-leaf", x: dir > 0 ? lx + 5 : lx - 5, y: l.y - 5, "text-anchor": dir > 0 ? "start" : "end" }, gNodes); lt.textContent = l.t;
+          edgeX = dir > 0 ? Math.max(edgeX, lOuter) : Math.min(edgeX, lOuter);
+          minY = Math.min(minY, l.y - 22); maxY = Math.max(maxY, l.y + 6);
+        }
+        if (dir > 0) maxX = Math.max(maxX, edgeX, fOuter); else minX = Math.min(minX, edgeX, fOuter);
+        minY = Math.min(minY, fe.y - 26); maxY = Math.max(maxY, fe.y + 8);
+      }
+      minY = Math.min(minY, br.y - 24); maxY = Math.max(maxY, br.y + 40);
+    }
+  }
+  // Nút trung tâm
+  const hub = el("g", {}, gNodes);
+  el("rect", { x: -HUB_W / 2, y: -HUB_H / 2, width: HUB_W, height: HUB_H, rx: 22, fill: "var(--hub)" }, hub);
+  const h1 = el("text", { class: "t-hub1", x: 0, y: -6, "text-anchor": "middle" }, hub); h1.textContent = "QUẢN LÝ THIẾT BỊ";
+  const h2 = el("text", { class: "t-hub2", x: 0, y: 18, "text-anchor": "middle" }, hub); h2.textContent = "Trường TH‑THCS‑THPT Tân Phú";
+
+  const pad = 30;
+  bbox = { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
+  if (!view) fit(); else apply();
+}
+
+// ---- Kéo / phóng to ----
+let view = null, moved = false;
+function apply() { svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`); }
+function fit() {
+  const r = svg.getBoundingClientRect(), ar = r.width / Math.max(r.height, 1);
+  let w = bbox.w, h = bbox.h;
+  if (w / h > ar) h = w / ar; else w = h * ar;
+  view = { x: bbox.x - (w - bbox.w) / 2, y: bbox.y - (h - bbox.h) / 2, w, h };
+  apply();
+}
+function zoom(f, cx, cy) {
+  const r = svg.getBoundingClientRect();
+  const px = cx === undefined ? .5 : (cx - r.left) / r.width, py = cy === undefined ? .5 : (cy - r.top) / r.height;
+  const nw = Math.min(Math.max(view.w * f, 200), bbox.w * 4), k = nw / view.w;
+  view.x += view.w * px * (1 - k); view.y += view.h * py * (1 - k); view.w *= k; view.h *= k; apply();
+}
+svg.addEventListener("wheel", e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY); }, { passive: false });
+const pts = new Map(); let last = null, pinch = null;
+svg.addEventListener("pointerdown", e => { svg.setPointerCapture(e.pointerId); pts.set(e.pointerId, e); last = e; moved = false; svg.classList.add("drag"); });
+svg.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, e);
+  const r = svg.getBoundingClientRect();
+  if (pts.size === 2) {
+    const [a, b] = [...pts.values()], d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (pinch) zoom(pinch / d, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+    pinch = d; moved = true; return;
+  }
+  const dx = e.clientX - last.clientX, dy = e.clientY - last.clientY;
+  if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+  view.x -= dx * view.w / r.width; view.y -= dy * view.h / r.height; last = e; apply();
+});
+const up = e => { pts.delete(e.pointerId); pinch = null; if (!pts.size) svg.classList.remove("drag"); else last = [...pts.values()][0]; };
+svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
+
+const bSteps = document.getElementById("btn-steps");
+const syncSteps = () => bSteps.setAttribute("aria-pressed", String(showSteps));
+bSteps.onclick = () => { showSteps = !showSteps; collapsed.clear(); syncSteps(); try { localStorage.setItem("qlts-map", JSON.stringify({ steps: showSteps })); } catch (e) {} render(); fit(); };
+document.getElementById("btn-fit").onclick = fit;
+document.getElementById("btn-in").onclick = () => zoom(1 / 1.25);
+document.getElementById("btn-out").onclick = () => zoom(1.25);
+addEventListener("resize", () => bbox && fit());
+
+syncSteps(); render();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { render(); fit(); });
+</script>
 </body>
 </html>
