@@ -6,7 +6,7 @@ Chạy:  streamlit run app.py
 import streamlit as st
 
 from qlts import auth, storage, ui
-from qlts.schema import ROLE_BGH, ROLE_KIEMKE, ROLE_QLTS
+from qlts.schema import ROLE_BGH, ROLE_KIEMKE, ROLE_QLTS, ROLE_TS
 
 st.set_page_config(page_title="Quản lý thiết bị", page_icon=":material/inventory_2:", layout="wide")
 
@@ -57,6 +57,8 @@ sections["Người dùng"] = [
 ]
 if user.has_any(ROLE_BGH, ROLE_QLTS):
     sections["Báo cáo"] = [page("bao_cao.py", "Báo cáo tổng quan BGH", ":material/bar_chart:")]
+if user.has_any(ROLE_BGH, ROLE_TS):
+    sections.setdefault("Báo cáo", []).append(page("tuyen_sinh.py", "Báo cáo tuyển sinh", ":material/school:"))
 if user.is_admin:
     sections["Phân quyền"] = [
         page("phan_quyen_admin.py", "Phân quyền admin", ":material/admin_panel_settings:"),

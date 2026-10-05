@@ -34,11 +34,13 @@ links = [("views/phong_quan_ly.py", "Phòng tôi quản lý", ":material/meeting
          ("views/thanh_ly.py", "Thanh lý tài sản", ":material/recycling:", schema.ROLE_QLTS),
          ("views/kiem_ke.py", "Kiểm kê", ":material/fact_check:", schema.ROLE_KIEMKE),
          ("views/bao_cao.py", "Báo cáo tổng quan", ":material/bar_chart:", schema.ROLE_BGH),
+         ("views/tuyen_sinh.py", "Báo cáo tuyển sinh", ":material/school:", schema.ROLE_TS),
          ("views/phan_quyen_admin.py", "Phân quyền", ":material/admin_panel_settings:", schema.ROLE_ADMIN)]
 allowed = [(p, t, i) for p, t, i, role in links
            if role is None or (role == schema.ROLE_ADMIN and user.is_admin) or
            (role == schema.ROLE_BGH and user.has_any(schema.ROLE_BGH, schema.ROLE_QLTS)) or
-           (role not in (schema.ROLE_ADMIN, schema.ROLE_BGH) and user.has_any(role))]
+           (role == schema.ROLE_TS and user.has_any(schema.ROLE_BGH, schema.ROLE_TS)) or
+           (role not in (schema.ROLE_ADMIN, schema.ROLE_BGH, schema.ROLE_TS) and user.has_any(role))]
 st.markdown("##### Truy cập nhanh")
 cols = st.columns(4)
 for n, (path, title, icon) in enumerate(allowed):

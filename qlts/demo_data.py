@@ -80,3 +80,56 @@ def build_demo_data() -> dict:
         schema.DIEU_CHUYEN: [],
         schema.KIEM_KE: [],
     }
+
+
+def build_demo_tuyensinh() -> dict:
+    """Hai list tuyển sinh mẫu (cố ý ghi quận/huyện không thống nhất để thử phần chuẩn hóa)."""
+    import random
+
+    rnd = random.Random(7)
+    districts = [  # (cách ghi trong dữ liệu, trọng số, các phường)
+        (["Tân Phú", "Q. Tân Phú", "Quận Tân Phú", "tân phú"], 30,
+         ["Phường Tân Sơn Nhì", "P. Tây Thạnh", "Phường Sơn Kỳ", "Phường Tân Quý", "Phường Phú Thọ Hòa",
+          "Phường Hòa Thạnh", "Phường Hiệp Tân", "P. Tân Thới Hòa"]),
+        (["Tân Bình", "Q.Tân Bình"], 14, ["Phường 13", "Phường 14", "P.15"]),
+        (["Bình Tân", "Quận Bình Tân"], 13, ["Phường Bình Hưng Hòa", "Phường Bình Trị Đông", "P. An Lạc"]),
+        (["Quận 6", "Q6"], 7, ["Phường 10", "Phường 11"]),
+        (["Quận 11", "Q.11"], 6, ["Phường 3", "Phường 5"]),
+        (["Bình Thạnh"], 5, ["Phường 25", "Phường 26"]),
+        (["Gò Vấp", "Q. Gò Vấp"], 5, ["Phường 10", "Phường 16"]),
+        (["Quận 8"], 3, ["Phường 4"]),
+        (["Bình Chánh", "H. Bình Chánh", "Huyện Bình Chánh"], 6, ["Xã Vĩnh Lộc A", "Thị trấn Tân Túc"]),
+        (["Hóc Môn"], 3, ["Xã Xuân Thới Sơn"]),
+        (["Thủ Đức", "TP Thủ Đức"], 3, ["Phường Linh Trung"]),
+        (["Quận 12"], 3, ["Phường Tân Thới Nhất"]),
+        (["Thuận An"], 2, ["Phường Lái Thiêu"]),
+    ]
+    weights = [d[1] for d in districts]
+    grades = [1, 1, 1, 2, 3, 6, 6, 6, 7, 8, 10, 10, 10, 11]
+    sources = ["Facebook", "Website", "Người quen giới thiệu", "Hội thảo tuyển sinh", "Zalo OA", "Trường mầm non"]
+    data, nhap_hoc = [], []
+    for start, volume in [(2021, 520), (2022, 610), (2023, 700), (2024, 760), (2025, 840)]:
+        nam = f"{start}-{start + 1}"
+        for i in range(volume):
+            d = rnd.choices(districts, weights)[0]
+            ward = rnd.choice(d[2])
+            grade = rnd.choice(grades)
+            enrolled = rnd.random() < 0.34 + 0.02 * (start - 2021)
+            status = "Đã nhập học" if enrolled else rnd.choice(["Đang tư vấn", "Không nhập học", "Đã test đầu vào"])
+            gioi = rnd.choice(["Nam", "Nữ"])
+            data.append({"Title": f"TS{start}-{i + 1:04d}", "Năm học": nam, "Khối đăng ký": f"Khối {grade}",
+                         "Quận/Huyện": rnd.choice(d[0]), "Phường/Xã": ward, "Giới tính": gioi,
+                         "Nguồn": rnd.choice(sources), "Trạng thái": status,
+                         "Created": f"{start}-{rnd.randint(1, 8):02d}-{rnd.randint(1, 28):02d}T08:00:00Z"})
+            if enrolled:
+                quan = d[0][0]
+                prefix = "" if quan.startswith(("Quận", "Huyện", "TP")) else ("Huyện " if quan in ("Bình Chánh", "Hóc Môn") else "Quận ")
+                if quan == "Thuận An":
+                    prefix = "TP. "
+                tinh = "Bình Dương" if quan == "Thuận An" else "TP. Hồ Chí Minh"
+                nhap_hoc.append({"Title": f"HS{start % 100}{len(nhap_hoc) + 1:04d}", "Năm học": nam,
+                                 "Lớp": f"{grade}A{rnd.randint(1, 4)}", "Giới tính": gioi,
+                                 "Địa chỉ": f"{rnd.randint(1, 300)} đường số {rnd.randint(1, 40)}, {ward}, "
+                                            f"{prefix}{quan}, {tinh}",
+                                 "Ngày nhập học": f"{start}-08-{rnd.randint(1, 28):02d}"})
+    return {"NhapHoc": nhap_hoc, "Data_TuyenSinh": data}
