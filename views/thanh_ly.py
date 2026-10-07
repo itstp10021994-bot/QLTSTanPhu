@@ -99,10 +99,25 @@ def hoso_downloads(word, pdf, stem: str, key: str) -> None:
                        on_click="ignore", key=f"{key}_docx")
 
 
+def with_device_info(items: pd.DataFrame) -> pd.DataFrame:
+    """Bổ sung từ list thiết bị (theo Mã chi tiết): ngày mua đầy đủ, và nguyên giá khi đợt thanh lý lưu 0."""
+    info = tb.drop_duplicates("MaChiTiet").set_index("MaChiTiet")
+    out = items.copy()
+    ngay = out["ma"].map(info["NgayMua"]).fillna("")
+    full = pd.to_datetime(ngay, errors="coerce")
+    out["ngay_mua"] = [f"{d:%d/%m/%Y}" if pd.notna(d) else str(o or "") for d, o in zip(full, out["ngay_mua"])]
+    gia = pd.to_numeric(out["gia_mua"], errors="coerce").fillna(0)
+    gia_tb = pd.to_numeric(out["ma"].map(info["GiaTri"]), errors="coerce").fillna(0)
+    out["gia_mua"] = gia.where(gia > 0, gia_tb)
+    out["con_lai"] = pd.to_numeric(out["con_lai"], errors="coerce").fillna(0)
+    return out
+
+
 def render_hoso(dot: str, rows: pd.DataFrame, items_r: pd.DataFrame, ngay_r: date) -> None:
     """3 mẫu hồ sơ sau khi xác nhận thanh lý: M02 – đề nghị mang ra ngoài, M06 – biên bản bàn giao – thanh lý,
     M07 – báo cáo kết quả thanh lý. Danh sách tài sản lấy từ đợt; các ô khác điền trên màn hình."""
     k = "hs_" + "".join(ch for ch in dot if ch.isalnum())[:40]
+    items_r = with_device_info(items_r)
     stem = dot.replace(" ", "_").replace("–", "-")
     so = str(rows["SoToTrinh"].iloc[0] or "").strip()
     grouped = hoso.group_items(items_r)

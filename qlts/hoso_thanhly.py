@@ -170,9 +170,10 @@ class KetQua:  # M07
     tham_quyen: str = ""
 
     def thu_hoi_text(self) -> str:
+        if not self.gia_tri_thu_hoi:  # chưa có số liệu -> để chỗ trống cho ghi tay
+            return "Giá trị thu hồi: …….. đồng (bằng chữ: …… đồng), đã bao gồm VAT."
         return (f"Giá trị thu hồi: {money(self.gia_tri_thu_hoi)} đồng (bằng chữ: "
-                f"{so_thanh_chu(self.gia_tri_thu_hoi).lower() if self.gia_tri_thu_hoi else '......'} đồng), "
-                "đã bao gồm VAT.")
+                f"{so_thanh_chu(self.gia_tri_thu_hoi).lower()} đồng), đã bao gồm VAT.")
 
     def ghi_giam_text(self) -> str:
         d = self.ngay_ghi_giam
@@ -238,14 +239,21 @@ def _cell_text(cell, text: str, bold: bool = False, size: float = 11, align: str
         r.bold, r.italic, r.font.size = bold, italic, Pt(size)
 
 
+def _usable_cm(doc) -> float:
+    sec = doc.sections[-1]
+    return (sec.page_width - sec.left_margin - sec.right_margin) / 360000
+
+
 def _header(doc, form: str) -> None:
     from docx.shared import Cm
 
     t = doc.add_table(rows=1, cols=3)
     t.style = "Table Grid"
-    widths = [Cm(4.2), Cm(8.6), Cm(4.6)]
-    for cell, w in zip(t.rows[0].cells, widths):
-        cell.width = w
+    t.autofit = False
+    full = _usable_cm(doc)  # khung tiêu đề rộng bằng trang (dọc hoặc ngang)
+    widths = [Cm(full * 0.24), Cm(full * 0.50), Cm(full * 0.26)]
+    for col, cell, w in zip(t.columns, t.rows[0].cells, widths):
+        col.width = cell.width = w
     if LOGO.exists():
         p = t.rows[0].cells[0].paragraphs[0]
         p.alignment = 1
@@ -272,9 +280,13 @@ def _grid(doc, headers: list[str], rows: list[list[str]], widths_cm: list[float]
         for i, v in enumerate(total):
             _cell_text(cells[i], v, bold=True, size=size,
                        align={"C": "center", "L": "left", "R": "right"}[aligns[i]])
+    scale = _usable_cm(doc) / sum(widths_cm)  # bảng rộng bằng trang
+    t.autofit = False
+    for col, w in zip(t.columns, widths_cm):
+        col.width = Cm(w * scale)
     for row in t.rows:
         for cell, w in zip(row.cells, widths_cm):
-            cell.width = Cm(w)
+            cell.width = Cm(w * scale)
     return t
 
 
