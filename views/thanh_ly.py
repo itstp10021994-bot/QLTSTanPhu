@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from qlts import auth, schema, storage, thanhly, thietbi, ui
+from qlts import hoso_thanhly as hoso
 from qlts.config import app_setting
 
 user = auth.require(schema.ROLE_QLTS)
@@ -90,6 +91,118 @@ def downloads(tl, stem: str, key: str) -> None:
                        icon=":material/description:", width="stretch", on_click="ignore", key=f"{key}_ttw")
 
 
+def hoso_downloads(word, pdf, stem: str, key: str) -> None:
+    c1, c2 = st.columns(2)
+    c1.download_button("Tải PDF", pdf, f"{stem}.pdf", "application/pdf", icon=":material/picture_as_pdf:",
+                       width="stretch", on_click="ignore", type="primary", key=f"{key}_pdf")
+    c2.download_button("Tải Word", word, f"{stem}.docx", DOCX, icon=":material/description:", width="stretch",
+                       on_click="ignore", key=f"{key}_docx")
+
+
+def render_hoso(dot: str, rows: pd.DataFrame, items_r: pd.DataFrame, ngay_r: date) -> None:
+    """3 mẫu hồ sơ sau khi xác nhận thanh lý: M02 – đề nghị mang ra ngoài, M06 – biên bản bàn giao – thanh lý,
+    M07 – báo cáo kết quả thanh lý. Danh sách tài sản lấy từ đợt; các ô khác điền trên màn hình."""
+    k = "hs_" + "".join(ch for ch in dot if ch.isalnum())[:40]
+    stem = dot.replace(" ", "_").replace("–", "-")
+    so = str(rows["SoToTrinh"].iloc[0] or "").strip()
+    grouped = hoso.group_items(items_r)
+    types = ", ".join(dict.fromkeys(str(t).strip().lower() for t in items_r["ten"] if str(t).strip()))
+    st.markdown(f"**Hồ sơ sau thanh lý – {dot}**")
+    st.caption("Hoàn tất quy trình thanh lý: đề nghị mang tài sản ra ngoài (M02), biên bản bàn giao – thanh lý cho "
+               "bên mua (M06) và báo cáo kết quả thanh lý (M07). Danh sách tài sản lấy từ đợt này.")
+    t2, t6, t7 = st.tabs(["M02 – Đề nghị mang tài sản ra ngoài", "M06 – Biên bản bàn giao – thanh lý",
+                          "M07 – Báo cáo kết quả thanh lý"])
+
+    with t2:
+        nguoi, _ = ui.party_picker(st.container(), "Người đề nghị", default=user.email, key=f"{k}_m02_nguoi",
+                                   inline=True)
+        c1, c2 = st.columns(2)
+        don_vi = c1.text_input("Đơn vị", app_setting("thanhly_don_vi", "Bộ phận Quản lý hệ thống"), key=f"{k}_m02_dv")
+        noi = c2.text_input("Mang ra ngoài", hoso.school(), key=f"{k}_m02_noi", help="[Công ty/Trường/Trung tâm]")
+        ly_do = st.text_input("Lý do", f"Mang tài sản đã thanh lý ({dot}"
+                              + (f", theo tờ trình số {so}" if so else "") + ") ra ngoài để bàn giao cho bên mua.",
+                              key=f"{k}_m02_lydo")
+        items2 = st.data_editor(
+            grouped.assign(ghi_chu="Tài sản thanh lý")[["ten", "dac_diem", "dvt", "sl", "ghi_chu"]],
+            hide_index=True, width="stretch", key=f"{k}_m02_items", disabled=["ten", "dac_diem", "dvt", "sl"],
+            column_config={"ten": "Tên tài sản", "dac_diem": "Đặc điểm", "dvt": "ĐVT", "sl": "Số lượng",
+                           "ghi_chu": "Ghi chú"})
+        c1, c2 = st.columns(2)
+        ky_ht = c1.text_input("Ký: CTQ/Hiệu trưởng", key=f"{k}_m02_ht")
+        ky_ql = c2.text_input("Ký: Đơn vị Quản lý tài sản", user.name, key=f"{k}_m02_ql")
+        d = hoso.DeNghi(items=items2, nguoi_de_nghi=nguoi, don_vi=don_vi.strip(), noi=noi.strip(),
+                        ly_do=ly_do.strip(), ky_hieu_truong=ky_ht.strip(), ky_quan_ly=ky_ql.strip())
+        hoso_downloads(lambda: hoso.m02_docx(d), lambda: hoso.m02_pdf(d), f"M02_de_nghi_mang_ra_{stem}", f"{k}_m02")
+
+    with t6:
+        c1, c2 = st.columns([1, 2])
+        ngay_bg = c1.date_input("Ngày bàn giao", value=ngay_r, format="DD/MM/YYYY", key=f"{k}_m06_ngay")
+        ben_tl = c2.text_input("Bên thanh lý", hoso.school(), key=f"{k}_m06_btl")
+        dia_chi = st.text_input("Địa chỉ bên thanh lý", hoso.school_address(), key=f"{k}_m06_dc")
+        st.markdown("Đại diện bên thanh lý")
+        reps = [ui.party_picker(st.container(), f"Đại diện {i}", default=user.email if i == 1 else "",
+                                key=f"{k}_m06_rep{i}", inline=True) for i in (1, 2)]
+        st.markdown("Bên mua")
+        c1, c2 = st.columns(2)
+        ben_mua = c1.text_input("Ông/Bà/Công ty", key=f"{k}_m06_mua")
+        dc_mua = c2.text_input("Địa chỉ", key=f"{k}_m06_dcmua")
+        c1, c2, c3 = st.columns(3)
+        cccd = c1.text_input("CCCD/CMND/Mã số thuế", key=f"{k}_m06_cccd")
+        dd = c2.text_input("Người đại diện", key=f"{k}_m06_dd", help="Khi bên mua là công ty/pháp nhân")
+        cccd_dd = c3.text_input("CCCD/CMND của người đại diện", key=f"{k}_m06_cccddd")
+        st.caption("Nhập đơn giá bán từng loại tài sản; thành tiền và tổng cộng tự tính.")
+        items6 = st.data_editor(
+            grouped.assign(don_gia=0.0)[["ten", "dac_diem", "dvt", "sl", "don_gia"]],
+            hide_index=True, width="stretch", key=f"{k}_m06_items", disabled=["ten", "dac_diem", "dvt", "sl"],
+            column_config={"ten": "Tên tài sản", "dac_diem": "Đặc điểm", "dvt": "ĐVT", "sl": "Số lượng",
+                           "don_gia": st.column_config.NumberColumn("Đơn giá (VNĐ)", min_value=0, step=1000,
+                                                                    format="localized")})
+        b = hoso.BanGiaoTL(items=items6, ngay=ngay_bg, ben_thanh_ly=ben_tl.strip(), dia_chi=dia_chi.strip(),
+                           dai_dien=[r for r in reps if r[0]], ben_mua=ben_mua.strip(), dia_chi_mua=dc_mua.strip(),
+                           cccd_mst=cccd.strip(), nguoi_dai_dien=dd.strip(), cccd_dai_dien=cccd_dd.strip())
+        c1, c2 = st.columns(2)
+        b.so_tien = c1.number_input("Số tiền bên mua đã thanh toán (VNĐ)", min_value=0.0, value=b.tong, step=1000.0,
+                                    format="%.0f", key=f"{k}_m06_tien_{int(b.tong)}")
+        b.ngay_thanh_toan = c2.date_input("Ngày thanh toán", value=ngay_bg, format="DD/MM/YYYY", key=f"{k}_m06_ngaytt")
+        st.markdown(f"Tổng cộng: **{thanhly.money(b.tong)} VNĐ** – "
+                    f"*{hoso.so_thanh_chu(b.tong) if b.tong else 'chưa nhập đơn giá'} đồng*")
+        if b.tong and abs(b.da_thanh_toan - b.tong) >= 1:
+            st.warning("Số tiền đã thanh toán khác tổng thành tiền – mẫu M06 chỉ dùng khi bên mua đã thanh toán đủ.")
+        st.session_state[f"{k}_thu_hoi"] = b.da_thanh_toan
+        hoso_downloads(lambda: hoso.m06_docx(b), lambda: hoso.m06_pdf(b), f"M06_bien_ban_ban_giao_thanh_ly_{stem}",
+                       f"{k}_m06")
+        st.caption("Bên mua là công ty/pháp nhân: điền mã số thuế và người đại diện; người ký không phải đại diện "
+                   "theo pháp luật thì cần giấy ủy quyền.")
+
+    with t7:
+        can_cu = st.text_input(
+            "Thực hiện theo", (f"Tờ trình số: {so}/TTr-TP" if so else "Tờ trình số: ....../TTr-TP")
+            + f" ngày {ngay_r.day} tháng {ngay_r.month} năm {ngay_r.year} về việc thanh lý {types}",
+            key=f"{k}_m07_cancu")
+        st.markdown("Nhân sự phụ trách việc thanh lý")
+        nhan_su = [ui.party_picker(st.container(), f"Nhân sự {i}", default=user.email if i == 1 else "",
+                                   key=f"{k}_m07_ns{i}", inline=True) for i in (1, 2, 3)]
+        c1, c2, c3 = st.columns(3)
+        chi_phi = c1.text_input("Chi phí thanh lý", "không phát sinh", key=f"{k}_m07_cp")
+        thu_hoi = st.session_state.get(f"{k}_thu_hoi", 0.0)
+        gia_tri = c2.number_input("Giá trị thu hồi (VNĐ, gồm VAT)", min_value=0.0, value=float(thu_hoi), step=1000.0,
+                                  format="%.0f", key=f"{k}_m07_thuhoi_{int(thu_hoi)}",
+                                  help="Mặc định lấy tổng tiền ở biên bản M06.")
+        ghi_giam = c3.date_input("Ngày ghi giảm tài sản", value=None, format="DD/MM/YYYY", key=f"{k}_m07_gg",
+                                 help="Để trống nếu kế toán chưa ghi giảm.")
+        c1, c2, c3, c4 = st.columns(4)
+        nguoi_lap = c1.text_input("Ký: Người lập báo cáo", user.name, key=f"{k}_m07_lap")
+        ke_toan = c2.text_input("Ký: Đơn vị phụ trách kế toán", key=f"{k}_m07_kt")
+        quan_ly = c3.text_input("Ký: Đơn vị QLTS / Hội đồng thanh lý", key=f"{k}_m07_ql")
+        tham_quyen = c4.text_input("Ký: Cấp thẩm quyền", key=f"{k}_m07_tq")
+        kq = hoso.KetQua(items=items_r, can_cu=can_cu.strip(), nhan_su=[n for n in nhan_su if n[0]],
+                         chi_phi=chi_phi.strip(), gia_tri_thu_hoi=gia_tri, ngay_ghi_giam=ghi_giam,
+                         nguoi_lap=nguoi_lap.strip(), ke_toan=ke_toan.strip(), quan_ly=quan_ly.strip(),
+                         tham_quyen=tham_quyen.strip())
+        hoso_downloads(lambda: hoso.m07_docx(kq), lambda: hoso.m07_pdf(kq), f"M07_bao_cao_ket_qua_thanh_ly_{stem}",
+                       f"{k}_m07")
+
+
 # ---------------------------------------------------------------------------
 with tab_rounds:
     if history.empty:
@@ -121,6 +234,8 @@ with tab_rounds:
         with st.container(border=True):
             st.markdown(f"**In lại biểu mẫu – {dot}** (nội dung tờ trình dùng mẫu mặc định; muốn sửa, mở bản Word)")
             downloads(tl_r, f"{dot}".replace(" ", "_").replace("–", "-"), key="tlr")
+        with st.container(border=True):
+            render_hoso(dot, rows, items_r, ngay_r)
         st.download_button("Tải danh sách đợt này (Excel)", on_click="ignore",
                            data=lambda: ui.to_excel({"ThanhLy": rows.drop(columns="id").rename(
                                columns=schema.labels_of(schema.THANH_LY))}),
@@ -228,7 +343,9 @@ with tab_new:
     with st.container(border=True):
         st.markdown(f"**5. Xác nhận thanh lý** – cập nhật Tình trạng = “{STATUS}” cho {len(items)} tài sản trên "
                     f"SharePoint (ghi chú thêm số tờ trình, ngày) và lưu danh sách vào **{dot}** (list ThanhLy). "
-                    "Tài sản đã thanh lý sẽ ẩn khỏi các màn hình chung.")
+                    "Tài sản đã thanh lý sẽ ẩn khỏi các màn hình chung. Sau khi xác nhận, lập tiếp 3 mẫu hồ sơ "
+                    "(M02 đề nghị mang ra ngoài, M06 biên bản bàn giao – thanh lý, M07 báo cáo kết quả) ở tab "
+                    "**Các đợt thanh lý**.")
 
         def confirm() -> str | None:
             note = f"Thanh lý theo TTr {tl.so_line()[4:]} ngày {ngay:%d/%m/%Y}" if so.strip() \
@@ -256,7 +373,10 @@ with tab_new:
                 return f"Có {len(errors)} lỗi:\n\n" + "\n\n".join(errors[:10]) + saved_note
             for i in items["id"]:
                 cart.remove(i)
-            ui.flash(f"Đã chuyển {len(ops)} tài sản sang “{STATUS}” và lưu vào {dot}.{saved_note}")
+            if not saved_note:
+                st.session_state["tl_round"] = dot.strip()  # mở sẵn đợt này ở tab Các đợt thanh lý
+            ui.flash(f"Đã chuyển {len(ops)} tài sản sang “{STATUS}” và lưu vào {dot}.{saved_note} "
+                     "Tiếp theo: tab **Các đợt thanh lý** → lập 3 mẫu hồ sơ sau thanh lý (M02, M06, M07).")
 
         if st.button("Xác nhận thanh lý", icon=":material/delete_sweep:", key="act_del_tl", disabled=items.empty):
             ui.confirm_dialog(
