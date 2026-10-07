@@ -433,7 +433,7 @@ def _pdf_table(pdf, headers, rows, widths, aligns, total=None, size: float = 10.
 
 def _pdf_signatures(pdf, blocks: list[tuple[str, str]], size: float = 11.5) -> None:
     width = pdf.w - pdf.l_margin - pdf.r_margin
-    if pdf.get_y() > pdf.h - pdf.b_margin - 36:  # giữ cả khối ký tên trên một trang
+    if pdf.get_y() > pdf.h - pdf.b_margin - 31:  # giữ cả khối ký tên trên một trang
         pdf.add_page()
     y = pdf.get_y() + 3
     w = width / len(blocks)
@@ -443,9 +443,9 @@ def _pdf_signatures(pdf, blocks: list[tuple[str, str]], size: float = 11.5) -> N
         pdf.set_xy(x, y)
         pdf.multi_cell(w, 5.5, title, align="C")
         pdf.set_font("TNR", "", size)
-        pdf.set_xy(x, y + 26)
+        pdf.set_xy(x, y + 22)
         pdf.cell(w, 6, name, align="C")
-    pdf.set_y(y + 34)
+    pdf.set_y(y + 30)
 
 
 def m02_pdf(d: DeNghi) -> bytes:
@@ -527,6 +527,7 @@ def m07_pdf(k: KetQua) -> bytes:
     pdf.set_auto_page_break(True, 12)
     pdf.add_page()
     _pdf_header(pdf, "M07")
+    pdf.set_y(pdf.get_y() - 2)
     pdf.set_font("TNR", "", 12)
     pdf.multi_cell(0, 6.3, "Thực hiện theo " + (k.can_cu or "……. số:....../20…/……. ngày.....tháng.....năm 20… về "
                                                 "việc thanh lý ……………………."), new_x="LMARGIN", new_y="NEXT")
