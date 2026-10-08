@@ -10,8 +10,7 @@ ROLE_ADMIN = "Quản trị hệ thống"
 ROLE_QLTS = "Ban quản lý tài sản"
 ROLE_KIEMKE = "Ban kiểm kê"
 ROLE_BGH = "Ban giám hiệu"
-ROLE_TS = "Ban tuyển sinh"
-ROLES = [ROLE_ADMIN, ROLE_QLTS, ROLE_KIEMKE, ROLE_BGH, ROLE_TS]
+ROLES = [ROLE_ADMIN, ROLE_QLTS, ROLE_KIEMKE, ROLE_BGH]
 
 # ---- Giá trị lựa chọn ----
 # Tình trạng: danh sách gợi ý; các giá trị khác đang có trong SharePoint vẫn được giữ và hiển thị.

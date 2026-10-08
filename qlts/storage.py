@@ -115,37 +115,6 @@ def _plain_value(list_name: str, col: str, value):
 # ---------------------------------------------------------------------------
 # SharePoint (Microsoft Graph)
 # ---------------------------------------------------------------------------
-RAW_PREFIX = "raw:"
-# Cột hệ thống của SharePoint – bỏ qua khi đọc list bất kỳ
-RAW_SKIP = {"ContentType", "Attachments", "Edit", "LinkTitle", "LinkTitleNoMenu", "LinkTitle2", "DocIcon",
-            "ItemChildCount", "FolderChildCount", "_UIVersionString", "AppAuthor", "AppEditor", "ComplianceAssetId",
-            "_ComplianceFlags", "_ComplianceTag", "_ComplianceTagWrittenTime", "_ComplianceTagUserId", "_IsRecord",
-            "_ColorTag", "Modified", "Editor", "Author", "ID", "id", "_DisplayName", "SelectTitle", "Version",
-            "ContentTypeId", "_ModerationStatus", "_ModerationComments", "Order", "GUID", "FileLeafRef",
-            "FileRef", "UniqueId", "ParentLeafName", "ParentVersionString", "_HasCopyDestinations",
-            "_CopySource", "owshiddenversion", "WorkflowVersion", "WorkflowInstanceID", "InstanceID",
-            "MetaInfo", "HTML_x0020_File_x0020_Type", "_Level", "_IsCurrentVersion", "Restricted",
-            "OriginatorId", "NoExecute", "ContentVersion", "_VirusStatus", "_VirusVendorID", "_VirusInfo",
-            "AccessPolicy", "SMTotalSize", "SMLastModifiedDate", "SMTotalFileStreamSize", "SMTotalFileCount",
-            "LinkFilenameNoMenu", "LinkFilename", "LinkFilename2", "ServerUrl", "EncodedAbsUrl", "BaseName",
-            "FileSizeDisplay", "PermMask", "ScopeId", "ProgId", "FSObjType", "SortBehavior", "CheckedOutUserId",
-            "IsCheckedoutToLocal", "CheckoutUser", "SyncClientId", "Created_x0020_Date", "Last_x0020_Modified",
-            "FileDirRef", "_CommentFlags", "_CommentCount", "_EditMenuTableStart", "_EditMenuTableStart2",
-            "_EditMenuTableEnd", "LinkCheckedOutTitle", "_UIVersion", "File_x0020_Type"}
-
-
-def _flat(value):
-    """Giá trị thô SharePoint -> chữ/số đơn giản (người/lookup lấy Title, nhiều giá trị nối bằng "; ")."""
-    if isinstance(value, dict):
-        if "results" in value:
-            value = value["results"]
-        else:
-            return value.get("Title") or value.get("LookupValue") or value.get("Label") or ""
-    if isinstance(value, list):
-        return "; ".join(str(_flat(v)) for v in value if v not in (None, ""))
-    return value
-
-
 class SharePointStore:
     def __init__(self, cfg: dict, token_provider=None):
         """``token_provider``: hàm trả về access token Graph. Bỏ trống -> dùng
@@ -258,40 +227,6 @@ class SharePointStore:
                 raise
             except StorageError:
                 pass
-
-    # -- List bất kỳ (không theo schema): dùng cho báo cáo tuyển sinh --
-    def list_titles(self) -> list[str]:
-        data = self._request("GET", f"/sites/{self.site_id}/lists?$select=id,displayName,webUrl,list&$top=999")
-        return sorted(lst.get("displayName", "") for lst in data.get("value", [])
-                      if not (lst.get("list") or {}).get("hidden")
-                      and (lst.get("list") or {}).get("template", "genericList") == "genericList")
-
-    def raw_items(self, title: str) -> tuple[list[tuple[str, str]], list[dict]]:
-        """Toàn bộ cột/dòng của một list theo tên hiển thị: ([(tên nội bộ, tên hiển thị)], [dòng])."""
-        data = self._request("GET", f"/sites/{self.site_id}/lists?$select=id,displayName,webUrl&$top=999")
-        wanted = _normalize(title)
-        lst = next((x for x in data.get("value", []) if wanted in (
-            _normalize(x.get("displayName", "")),
-            _normalize(requests.utils.unquote(x.get("webUrl", "").rstrip("/").split("/")[-1])))), None)
-        if not lst:
-            raise StorageError(f"Không tìm thấy list “{title}” trên site.")
-        base = f"/sites/{self.site_id}/lists/{lst['id']}"
-        cols = []
-        for c in self._request("GET", f"{base}/columns").get("value", []):
-            name = c["name"]
-            if c.get("hidden") or name in RAW_SKIP or "personOrGroup" in c or "lookup" in c:
-                continue
-            if c.get("readOnly") and name not in ("Title", "Created") and "calculated" not in c:
-                continue
-            cols.append((name, c.get("displayName") or name))
-        rows, url = [], f"{base}/items?$expand=fields&$top=999"
-        while url:
-            page = self._request("GET", url)
-            for item in page.get("value", []):
-                fields = item.get("fields", {})
-                rows.append({name: _flat(fields.get(name)) for name, _ in cols})
-            url = page.get("@odata.nextLink")
-        return cols, rows
 
     # -- Dò cột --
     def sp_columns(self, list_name: str) -> list[dict]:
@@ -649,51 +584,6 @@ class BridgeStore(SharePointStore):
         self.forget_schema()
         return name
 
-    def list_titles(self) -> list[str]:
-        return sorted(lst.get("Title", "") for lst in self._lists_index() if lst.get("BaseTemplate", 100) == 100)
-
-    def raw_items(self, title: str) -> tuple[list[tuple[str, str]], list[dict]]:
-        wanted = _normalize(title)
-        lst = None
-        for attempt in range(2):
-            for x in self._lists_index():
-                url = (x.get("RootFolder") or {}).get("ServerRelativeUrl", "")
-                if wanted in (_normalize(x.get("Title", "")),
-                              _normalize(requests.utils.unquote(url.rstrip("/").split("/")[-1]))):
-                    lst = x
-                    break
-            if lst or attempt:
-                break
-            self._index = None  # list mới tạo -> đọc lại danh sách list một lần
-        if not lst:
-            raise StorageError(f"Không tìm thấy list “{title}” trên site của flow.")
-        base = f"_api/web/lists(guid'{lst['Id']}')"
-        fields = self.rest("GET", f"{base}/fields?$select=InternalName,Title,TypeAsString,ReadOnlyField,Hidden"
-                                  "&$filter=Hidden eq false").get("value", [])
-        cols, select, expand = [], ["Id"], []
-        for f in fields:
-            name, typ = f["InternalName"], f.get("TypeAsString", "")
-            if name in RAW_SKIP or typ == "Computed" or name in {c for c, _ in cols}:
-                continue
-            if f.get("ReadOnlyField") and name not in ("Title", "Created") and typ != "Calculated":
-                continue
-            if typ in ("User", "UserMulti", "Lookup", "LookupMulti"):
-                select.append(f"{name}/Title")
-                expand.append(name)
-            else:
-                select.append(name)
-            cols.append((name, f.get("Title") or name))
-        uri = f"{base}/items?$select={','.join(select)}" + (f"&$expand={','.join(expand)}" if expand else "") \
-            + "&$top=5000"
-        rows = []
-        while uri:
-            data = self.rest("GET", uri)
-            for item in data.get("value", []):
-                rows.append({name: _flat(item.get(name)) for name, _ in cols})
-            nxt = data.get("odata.nextLink") or data.get("@odata.nextLink") or ""
-            uri = "_api/" + nxt.split("/_api/", 1)[1] if "/_api/" in nxt else ""
-        return cols, rows
-
     def _lists_index(self) -> list[dict]:
         """Danh sách các list của site – gọi flow MỘT lần rồi dùng lại cho mọi list."""
         with self._index_lock:
@@ -827,29 +717,6 @@ class LocalStore:
     def list_items(self, list_name: str) -> list[dict]:
         with self._lock:
             return self._read().get(list_name, [])
-
-    def _raw_data(self) -> dict:
-        with self._lock:
-            data = self._read()
-            if not any(k.startswith(RAW_PREFIX) for k in data):
-                from .demo_data import build_demo_tuyensinh
-
-                data.update({RAW_PREFIX + k: v for k, v in build_demo_tuyensinh().items()})
-                self._write(data)
-            return data
-
-    def list_titles(self) -> list[str]:
-        return sorted(k[len(RAW_PREFIX):] for k in self._raw_data() if k.startswith(RAW_PREFIX))
-
-    def raw_items(self, title: str) -> tuple[list[tuple[str, str]], list[dict]]:
-        data = self._raw_data()
-        key = next((k for k in data if k.startswith(RAW_PREFIX) and _normalize(k[len(RAW_PREFIX):]) == _normalize(title)),
-                   None)
-        if key is None:
-            raise StorageError(f"Không tìm thấy list “{title}” (chế độ demo).")
-        rows = data[key]
-        names = list(dict.fromkeys(c for r in rows for c in r))
-        return [(c, c) for c in names], rows
 
     def create(self, list_name: str, fields: dict) -> str:
         with self._lock:
@@ -1095,28 +962,6 @@ def load_fresh(list_name: str) -> pd.DataFrame:
     """Đọc thẳng từ SharePoint, bỏ qua bộ nhớ đệm (dùng khi sinh mã mới)."""
     df = _to_frame(list_name, get_store().list_items(list_name))
     _put((_cache_scope(), list_name), df)
-    return df.copy()
-
-
-# ---- List bất kỳ (không theo schema) ----
-def raw_lists() -> list[str]:
-    """Tên các list trên site (để chọn nguồn dữ liệu cho báo cáo tuyển sinh)."""
-    return get_store().list_titles()
-
-
-def load_raw(title: str) -> pd.DataFrame:
-    """Toàn bộ dữ liệu của một list bất kỳ, cột đặt theo TÊN HIỂN THỊ trên SharePoint (giá trị dạng chữ/số)."""
-    key = (_cache_scope(), RAW_PREFIX + title)
-    df = _cached(key)
-    if df is None:
-        with st.spinner(f"Đang tải list {title}..."):
-            cols, rows = get_store().raw_items(title)
-        names, seen = [], {}
-        for _, label in cols:  # tên hiển thị trùng nhau -> thêm số thứ tự
-            seen[label] = seen.get(label, 0) + 1
-            names.append(label if seen[label] == 1 else f"{label} ({seen[label]})")
-        df = pd.DataFrame([[r.get(c) for c, _ in cols] for r in rows], columns=names)
-        _put(key, df)
     return df.copy()
 
 
