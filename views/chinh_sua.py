@@ -24,7 +24,7 @@ event = st.dataframe(
 # Bấm vào ô bất kỳ (hoặc ô chọn đầu dòng) đều tính là chọn dòng đó
 cells = list(getattr(event.selection, "cells", []) or [])
 sel_rows = list(event.selection.rows) or [c[0] if isinstance(c, (list, tuple)) else c["row"] for c in cells[:1]]
-chosen = filtered.iloc[sel_rows[:1]]
+chosen = ui.picked(filtered, sel_rows[:1])
 sel_sig = (tuple(event.selection.rows), tuple(tuple(c) if isinstance(c, (list, tuple)) else str(c) for c in cells))
 
 

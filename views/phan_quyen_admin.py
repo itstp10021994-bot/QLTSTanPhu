@@ -73,10 +73,10 @@ if kw:
 
 actions = st.container()
 event = st.dataframe(
-    view, hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"pq_table_{ver}",
+    view, hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"pq_table_{ver}_{ui.rows_key(view)}",
     column_config={"id": None, "Title": "Email", "HoTen": "Họ tên", "VaiTro": "Vai trò", "ChucDanh": "Chức danh"},
 )
-chosen = view.iloc[event.selection.rows]
+chosen = ui.picked(view, event.selection.rows)
 
 
 def delete_selected() -> str | None:

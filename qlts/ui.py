@@ -151,6 +151,19 @@ def room_label_map() -> dict[str, str]:
     return {r: f"{r} - {phong[r]}" if phong.get(r) and phong[r].strip() != r else r for r in thietbi.all_rooms()}
 
 
+
+def rows_key(df: pd.DataFrame) -> str:
+    """Mã ngắn theo danh sách dòng đang hiển thị – thêm vào key của bảng chọn dòng để lựa chọn cũ
+    tự xóa khi dữ liệu thay đổi (tránh chọn nhầm dòng đã dịch chỗ hoặc vượt quá số dòng)."""
+    ids = tuple(df["id"]) if "id" in df.columns else tuple(df.index)
+    return format(hash(ids) & 0xFFFFFFFF, "x")
+
+
+def picked(df: pd.DataFrame, rows) -> pd.DataFrame:
+    """Các dòng được chọn trong bảng; bỏ qua chỉ số không còn hợp lệ."""
+    return df.iloc[[r for r in rows if 0 <= r < len(df)]]
+
+
 def to_excel(sheets: dict[str, pd.DataFrame]) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -343,16 +356,16 @@ def reconcile_panel(list_key: str, data: pd.DataFrame, existing: pd.DataFrame, k
             st.markdown(f"**{len(extra)} bản ghi có trên SharePoint nhưng không có trong file.** "
                         "Tick những dòng muốn xóa (nếu file của bạn là danh sách đầy đủ):")
             ev = st.dataframe(extra[["id", *show_cols]].rename(columns=labels), hide_index=True, width="stretch",
-                              on_select="rerun", selection_mode="multi-row", key=f"{key}_extra",
+                              on_select="rerun", selection_mode="multi-row", key=f"{key}_extra_{rows_key(extra)}",
                               height=min(400, 38 + 35 * len(extra)))
-            picked = extra.iloc[ev.selection.rows]
-            if st.button(f"Xóa {len(picked)} dòng đã chọn", key=f"{key}_delextra", icon=":material/delete:",
-                         disabled=picked.empty):
-                ids = list(picked["id"])
+            sel = picked(extra, ev.selection.rows)
+            if st.button(f"Xóa {len(sel)} dòng đã chọn", key=f"{key}_delextra", icon=":material/delete:",
+                         disabled=sel.empty):
+                ids = list(sel["id"])
                 confirm_dialog(
                     "Xóa bản ghi không có trong file", f"Xóa **{len(ids)} bản ghi** khỏi SharePoint?",
                     lambda: _delete_ids(list_key, ids),
-                    details=[" / ".join(str(r[c]) for c in show_cols) for _, r in picked.iterrows()],
+                    details=[" / ".join(str(r[c]) for c in show_cols) for _, r in sel.iterrows()],
                 )
 
 

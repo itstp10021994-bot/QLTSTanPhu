@@ -125,11 +125,11 @@ view = view.reset_index(drop=True)
 
 actions = st.container()
 event = st.dataframe(
-    view, hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"phong_table_{ver}",
+    view, hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"phong_table_{ver}_{ui.rows_key(view)}",
     column_config={"id": None, "Title": "Mã phòng", "TenPhong": "Tên phòng", "NguoiQuanLy": "Email người quản lý",
                    "TenNguoiQuanLy": "Tên người quản lý", "SoTB": st.column_config.NumberColumn("Số thiết bị")},
 )
-chosen = view.iloc[event.selection.rows]
+chosen = ui.picked(view, event.selection.rows)
 busy = chosen[chosen["SoTB"] > 0]
 
 

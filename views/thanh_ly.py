@@ -273,9 +273,9 @@ with tab_new:
         event = st.dataframe(
             filtered[ui.TB_VIEW].rename(columns=schema.labels_of(schema.THIET_BI)), hide_index=True,
             width="stretch", height=300, on_select="rerun", selection_mode="multi-row",
-            key=f"tl_pick_{len(cart)}", column_config={"Giá trị": st.column_config.NumberColumn(format="localized")},
+            key=f"tl_pick_{len(cart)}_{ui.rows_key(filtered)}", column_config={"Giá trị": st.column_config.NumberColumn(format="localized")},
         )
-        picked = filtered.iloc[event.selection.rows]
+        picked = ui.picked(filtered, event.selection.rows)
         if st.button(f"Thêm {len(picked)} tài sản vào danh sách thanh lý", icon=":material/playlist_add:",
                      disabled=picked.empty, type="primary"):
             cart.extend(i for i in picked["id"] if i not in cart)

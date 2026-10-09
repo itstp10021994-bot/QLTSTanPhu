@@ -23,9 +23,9 @@ else:
     event = st.dataframe(
         in_room[["MaChiTiet", "TenThietBi", "DacDiem", "TenPhongBan", "NguoiSuDung", "TinhTrang"]]
         .rename(columns=schema.labels_of(schema.THIET_BI)),
-        hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"dc_sel_{tu_phong}",
+        hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row", key=f"dc_sel_{tu_phong}_{ui.rows_key(in_room)}",
     )
-    chosen = in_room.iloc[event.selection.rows]
+    chosen = ui.picked(in_room, event.selection.rows)
     with st.form("dieu_chuyen"):
         c1, c2, c3 = st.columns(3)
         dest_opts = [r for r in rooms if r != tu_phong] + [schema.NOI_THANH_LY]
@@ -71,9 +71,9 @@ dc = storage.load(schema.DIEU_CHUYEN).sort_values(["NgayDieuChuyen", "id"], asce
 hist_cols = ["Title", "TenThietBi", "TuPhong", "DenPhong", "NgayDieuChuyen", "NguoiThucHien", "LyDo"]
 hist = st.dataframe(
     dc[hist_cols].rename(columns=schema.labels_of(schema.DIEU_CHUYEN)), hide_index=True, width="stretch",
-    on_select="rerun", selection_mode="multi-row", key="dc_hist", height=260,
+    on_select="rerun", selection_mode="multi-row", key=f"dc_hist_{ui.rows_key(dc)}", height=260,
 )
-hist_sel = dc.iloc[hist.selection.rows]
+hist_sel = ui.picked(dc, hist.selection.rows)
 
 # ---------------------------------------------------------------------------
 # Biên bản nghiệm thu / bàn giao cho thiết bị điều chuyển
